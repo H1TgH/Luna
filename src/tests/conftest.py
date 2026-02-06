@@ -1,69 +1,45 @@
-import asyncio
-
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-
-from infrastructure.database.database import Base, get_db
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from main import app
+from infrastructure.database.database import Base, Session
 from settings import settings
 
-# Создаем отдельный движок для тестов
-test_engine = create_async_engine(
-    settings.db.database_url,
-    echo=False,
-    future=True,
-)
+@pytest_asyncio.fixture(scope="function")
+async def db_session():
+    engine = create_async_engine(settings.db.database_url, future=True, echo=False)
 
-TestSessionLocal = async_sessionmaker(
-    bind=test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def setup_database():
-    """Создает и очищает базу данных перед каждым тестом"""
-    async with test_engine.begin() as conn:
+    # создаём схему
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
-    yield
+    async_session_factory = async_sessionmaker(
+        bind=engine, class_=AsyncSession, expire_on_commit=False
+    )
 
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    async with engine.connect() as conn:
+        transaction = await conn.begin()
+        async with async_session_factory(bind=conn) as session:
+
+            # Подменяем get_db на фикстурную сессию
+            async def override_get_db():
+                try:
+                    yield session
+                finally:
+                    pass
+
+            app.dependency_overrides[Session] = override_get_db
+            try:
+                yield session
+            finally:
+                await transaction.rollback()
+                app.dependency_overrides.clear()
+
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture
-async def db_session():
-    """Предоставляет сессию базы данных с автоматическим откатом"""
-    async with TestSessionLocal() as session:
-        yield session
-        await session.rollback()
-
-
-@pytest_asyncio.fixture
-async def client(db_session: AsyncSession):
-    """HTTP клиент с переопределенной зависимостью базы данных"""
-
-    async def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test"
-    ) as ac:
+async def client(db_session):  # передаём фикстуру сессии
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
-
-    app.dependency_overrides.clear()
-
-
-@pytest_asyncio.fixture(scope="session")
-def event_loop():
-    """Создает event loop для всей сессии тестов"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
