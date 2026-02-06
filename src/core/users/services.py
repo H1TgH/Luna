@@ -4,6 +4,7 @@ from uuid import UUID
 
 import bcrypt
 from jose import ExpiredSignatureError, JWTError, jwt
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.users.entities import UserCreationDTO, UserLoginDTO, UserUpdateDTO
 from core.users.exceptions import (
@@ -19,11 +20,12 @@ from settings import settings
 
 
 class UserService:
-    def __init__(self, uow: UnitOfWork):
+    def __init__(self, uow: UnitOfWork, session: AsyncSession = None):
         self.uow = uow
+        self.session = session
 
     async def create(self, user: UserCreationDTO):
-        async with self.uow() as session:
+        async with self.uow(self.session) as session:
             repository = UserRepository(session)
 
             existing_user = await repository.get_by_email(user.email)
@@ -36,7 +38,7 @@ class UserService:
             await repository.add(user)
 
     async def delete(self, user_id: UUID):
-        async with self.uow() as session:
+        async with self.uow(self.session) as session:
             repository = UserRepository(session)
 
             existing_user = await repository.get_by_id(user_id)
@@ -46,7 +48,7 @@ class UserService:
             await repository.delete(user_id)
 
     async def update(self, user_id: UUID, user: UserUpdateDTO):
-        async with self.uow() as session:
+        async with self.uow(self.session) as session:
             repository = UserRepository(session)
 
             existing_user = await repository.get_by_id(user_id)
@@ -56,7 +58,7 @@ class UserService:
             await repository.update(user_id, user)
 
     async def authenticate(self, creds: UserLoginDTO):
-        async with self.uow() as session:
+        async with self.uow(self.session) as session:
             repository = UserRepository(session)
             user = await repository.get_by_email(creds.email)
             if not user or not self.verify_password(creds.password, user.password):
@@ -65,7 +67,7 @@ class UserService:
         return user
 
     async def get_current_user(self, token: str) -> UserModel:
-        async with self.uow() as session:
+        async with self.uow(self.session) as session:
             repository = UserRepository(session)
 
             payload = self.verify_token(token, "access")
@@ -112,5 +114,5 @@ class UserService:
         return payload
 
 
-def get_user_service():
-    return UserService(UnitOfWork())
+def get_user_service(session: AsyncSession = None):
+    return UserService(UnitOfWork(), session)
