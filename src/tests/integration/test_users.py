@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from infrastructure.database.models.users import UserModel
 
 
+
 @pytest.mark.asyncio
 async def test_user_register(client: AsyncClient, db_session: AsyncSession):
+    """Тест успешной регистрации пользователя"""
     response = await client.post("/api/v1/users/register", json={
         "email": "ivan@example.com",
         "password": "123123123",
@@ -22,11 +24,15 @@ async def test_user_register(client: AsyncClient, db_session: AsyncSession):
     assert response.status_code == HTTPStatus.CREATED
     assert response.json()["msg"] == "User created successfully"
 
+    # Проверяем, что пользователь создан в базе
     stmt = select(UserModel).where(UserModel.email == "ivan@example.com")
     result = await db_session.execute(stmt)
     user = result.scalars().first()
 
     assert user is not None
+    assert user.email == "ivan@example.com"
+    assert user.first_name == "ivan"
+    assert user.last_name == "fedorov"
 
 @pytest.mark.asyncio
 async def test_user_register1(client: AsyncClient, db_session: AsyncSession):
