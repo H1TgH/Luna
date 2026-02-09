@@ -1,0 +1,2 @@
+class ProfileAlreadyExistsException(Exception):
+    pass
