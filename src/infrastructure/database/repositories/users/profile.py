@@ -13,6 +13,7 @@ class ProfileRepository:
 
     async def add(self, data: ProfileCreationDTO, user_id: UUID) -> None:
         self.session.add(ProfileModel(
+            username=data.username,
             user_id=user_id,
             first_name=data.first_name,
             last_name=data.last_name,
@@ -26,8 +27,8 @@ class ProfileRepository:
 
         return result.scalar_one_or_none()
 
-    async def get_by_id(self, profile_id: UUID) -> ProfileModel:
-        stmt = select(ProfileModel).where(ProfileModel.id == profile_id)
+    async def get_by_username(self, username: str) -> ProfileModel:
+        stmt = select(ProfileModel).where(ProfileModel.username == username)
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()

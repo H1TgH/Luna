@@ -36,6 +36,7 @@ class AuthService:
     async def authenticate(self, creds: UserLoginDTO) -> AuthenticatedUserDTO:
         async with self.uow() as session:
             repository = AuthRepository(session)
+
             user = await repository.get_by_email(creds.email)
             if not user or not self.verify_password(creds.password, user.password):
                 raise InvalidCredentialsException("Incorrect email or password")

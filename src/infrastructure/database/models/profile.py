@@ -33,7 +33,7 @@ class ProfileModel(Base):
     username: Mapped[str] = mapped_column(
         String(32),
         unique=True,
-        nullable=True,
+        nullable=False,
     )
 
     first_name: Mapped[str] = mapped_column(
