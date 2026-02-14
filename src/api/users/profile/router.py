@@ -1,11 +1,10 @@
 from dataclasses import asdict
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from api.users.profile.schemas import ProfileCreationSchema, ProfileSchema
+from api.users.profile.schemas import ProfileCreationSchema, ProfileSchema, ProfileUpdateSchema
 from core.users.auth.entities import CurrentUserDTO
-from core.users.profile.entities import ProfileCreationDTO
+from core.users.profile.entities import ProfileCreationDTO, ProfileUpdateDTO
 from core.users.profile.services import ProfileService, get_profile_service
 from dependencies import get_current_user
 
@@ -54,10 +53,28 @@ async def get_my_profile(
     response_model=ProfileSchema
 )
 async def get_profile(
-    username: str | UUID,
+    username: str,
     service: ProfileService = Depends(get_profile_service),
     current_user: CurrentUserDTO = Depends(get_current_user)
 ):
     profile = await service.get_by_username(username)
 
     return ProfileSchema(**asdict(profile))
+
+
+@profile_router.patch(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def update_profile(
+    data: ProfileUpdateSchema,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
+):
+    dto = ProfileUpdateDTO(**data.model_dump())
+
+    await service.update(dto, current_user)
+
+    return {
+        "msg": "Profile updated successfully"
+    }

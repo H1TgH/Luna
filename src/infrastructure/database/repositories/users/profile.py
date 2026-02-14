@@ -1,9 +1,11 @@
+from dataclasses import asdict
 from uuid import UUID
+from zoneinfo import reset_tzpath
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.users.profile.entities import ProfileCreationDTO
+from core.users.profile.entities import ProfileCreationDTO, ProfileUpdateDTO
 from infrastructure.database.models.profile import ProfileModel
 
 
@@ -20,6 +22,19 @@ class ProfileRepository:
             birth_date=data.birth_date,
             gender=data.gender
         ))
+
+    async def update(self, data: ProfileUpdateDTO, user_id: UUID) -> None:
+        update_data = {
+            k: v
+            for k, v in asdict(data).items()
+            if v is not None
+        }
+
+        await self.session.execute(
+            update(ProfileModel)
+            .where(ProfileModel.user_id == user_id)
+            .values(update_data)
+        )
 
     async def get_by_user_id(self, user_id: UUID) -> ProfileModel:
         stmt = select(ProfileModel).where(ProfileModel.user_id == user_id)

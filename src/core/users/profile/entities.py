@@ -25,3 +25,12 @@ class ProfileReadDTO:
     birth_date: date
     avatar_uploaded: bool
     status: str | None
+
+
+@dataclass
+class ProfileUpdateDTO:
+    first_name: str | None
+    last_name: str | None
+    birth_date: date | None
+    gender: GenderEnum | None
+    status: str | None

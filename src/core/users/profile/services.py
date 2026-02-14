@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from core.users.auth.entities import CurrentUserDTO
-from core.users.profile.entities import ProfileCreationDTO, ProfileReadDTO
+from core.users.profile.entities import ProfileCreationDTO, ProfileReadDTO, ProfileUpdateDTO
 from core.users.profile.exceptions import ProfileAlreadyExistsException
 from infrastructure.database.repositories.users.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
@@ -60,6 +60,13 @@ class ProfileService:
             )
 
         return dto
+
+    async def update(self, data: ProfileUpdateDTO, user: CurrentUserDTO) -> None:
+        async with self.uow() as session:
+            repository = ProfileRepository(session)
+
+            await repository.update(data, user.id)
+
 
 def get_profile_service():
     return ProfileService(UnitOfWork())

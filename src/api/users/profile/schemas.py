@@ -24,3 +24,11 @@ class ProfileSchema(BaseModel):
     birth_date: date
     avatar_uploaded: bool
     status: str | None
+
+
+class ProfileUpdateSchema(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    birth_date: date | None = None
+    gender: GenderEnum | None = None
+    status: str | None = None
