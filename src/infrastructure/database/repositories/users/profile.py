@@ -1,6 +1,5 @@
 from dataclasses import asdict
 from uuid import UUID
-from zoneinfo import reset_tzpath
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession

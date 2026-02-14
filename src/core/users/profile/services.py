@@ -2,7 +2,7 @@ from uuid import UUID
 
 from core.users.auth.entities import CurrentUserDTO
 from core.users.profile.entities import ProfileCreationDTO, ProfileReadDTO, ProfileUpdateDTO
-from core.users.profile.exceptions import ProfileAlreadyExistsException
+from core.users.profile.exceptions import ProfileAlreadyExistsException, ProfileDoesNotExistException
 from infrastructure.database.repositories.users.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
 
@@ -46,6 +46,8 @@ class ProfileService:
             repository = ProfileRepository(session)
 
             profile = await repository.get_by_username(username)
+            if profile is None:
+                raise ProfileDoesNotExistException("Profile does not exist")
 
             dto = ProfileReadDTO(
                 id=profile.id,

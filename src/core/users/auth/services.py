@@ -87,10 +87,10 @@ class AuthService:
                 settings.security.secret_key.get_secret_value(),
                 algorithms=[settings.security.algorithm.get_secret_value()],
             )
-        except ExpiredSignatureError:
-            raise InvalidTokenException("Token expired") from None
-        except JWTError:
-            raise InvalidTokenException("Invalid token") from None
+        except ExpiredSignatureError as e:
+            raise InvalidTokenException("Token expired") from e
+        except JWTError as e:
+            raise InvalidTokenException("Invalid token") from e
 
         if payload.get("type") != token_type:
             raise InvalidTokenException("Invalid token type")
