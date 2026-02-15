@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 
+import bcrypt
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.users.auth.services import AuthService, get_auth_service
+from infrastructure.database.models.users import UserModel
 from main import app
 
 
@@ -51,3 +53,26 @@ async def client(test_user_service):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def user_auth_payload():
+    def payload(**overrides):
+        data = {
+            "email": "test@example.com",
+            "password": "123123123",
+        }
+        data.update(overrides)
+        return data
+
+    return payload
+
+
+@pytest.fixture
+async def test_user(db_session: AsyncSession):
+    db_session.add(UserModel(
+        email="test@example.com",
+        password=bcrypt.hashpw(b"123123123", bcrypt.gensalt()).decode(),)
+    )
+
+    await db_session.commit()
