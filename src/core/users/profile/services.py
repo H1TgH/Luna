@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from uuid import UUID
 
 from core.users.auth.entities import CurrentUserDTO
@@ -15,8 +16,12 @@ class ProfileService:
         async with self.uow() as session:
             repository = ProfileRepository(session)
 
-            existing_profile = await repository.get_by_user_id(user.id)
-            if existing_profile:
+            existing_user_id = await repository.get_by_user_id(user.id)
+            if existing_user_id:
+                raise ProfileAlreadyExistsException("Profile already exists")
+
+            existing_username = await repository.get_by_username(data.username)
+            if existing_username:
                 raise ProfileAlreadyExistsException("Profile already exists")
 
             await repository.add(data, user.id)
@@ -26,6 +31,8 @@ class ProfileService:
             repository = ProfileRepository(session)
 
             profile = await repository.get_by_user_id(user_id)
+            if not profile:
+                raise ProfileDoesNotExistException("Profile does not exist")
 
             dto = ProfileReadDTO(
                 id=profile.id,
@@ -67,7 +74,19 @@ class ProfileService:
         async with self.uow() as session:
             repository = ProfileRepository(session)
 
-            await repository.update(data, user.id)
+            existing_profile = await repository.get_by_user_id(user.id)
+            if existing_profile is None:
+                raise ProfileDoesNotExistException("Profile does not exist")
+
+            update_data = {
+                k: v
+                for k, v in asdict(data).items()
+                if v is not None
+            }
+            if not update_data:
+                raise ValueError("No fields provided for update")
+
+            await repository.update(update_data, user.id)
 
 
 def get_profile_service():

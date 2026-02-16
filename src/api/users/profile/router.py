@@ -79,7 +79,3 @@ async def update_profile(
     dto = ProfileUpdateDTO(**data.model_dump())
 
     await service.update(dto, current_user)
-
-    return {
-        "msg": "Profile updated successfully"
-    }

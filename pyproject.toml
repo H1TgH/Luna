@@ -82,5 +82,4 @@ line-ending = "auto"
 "src/**/*.py" = ["B008"]
 "src/infrastructure/database/models/*.py" = ["F821"]
 "src/tests/**/*.py" = ["S101"]
-"src/tests/integration/*.py" = ["S106"]
-
+"src/tests/*.py" = ["S106", "S107"]

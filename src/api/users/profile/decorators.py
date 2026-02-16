@@ -10,7 +10,7 @@ def handle_profile_exceptions(func):
     async def wrapped(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
-        except ProfileAlreadyExistsException as e:
+        except (ProfileAlreadyExistsException, ValueError) as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e)
