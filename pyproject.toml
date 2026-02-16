@@ -1,0 +1,85 @@
+[project]
+name = "luna"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.3",
+    "asyncpg>=0.31.0",
+    "bcrypt>=5.0.0",
+    "fastapi>=0.128.0",
+    "pydantic[email]>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "pytest>=9.0.2",
+    "python-jose>=3.5.0",
+    "ruff>=0.14.14",
+    "sqlalchemy>=2.0.46",
+    "uvicorn>=0.40.0",
+    "httpx>=0.28.1",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py313"
+src = ["src"]
+exclude = [
+    "migrations",
+]
+
+[tool.ruff.lint]
+preview = true
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "UP",
+    "S",
+    "BLE",
+    "T20",
+    "T10",
+    "PT",
+    "RUF",
+    "DTZ",
+    "ERA",
+    "FURB",
+    "Q",
+]
+ignore = [
+    "C408",
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    "S110",
+
+]
+fixable = [
+    "I",
+]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "double"
+multiline-quotes = "double"
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+combine-as-imports = true
+lines-after-imports = 2
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.per-file-ignores]
+"src/**/*.py" = ["B008"]
+"src/infrastructure/database/models/*.py" = ["F821"]
+"src/tests/**/*.py" = ["S101"]
+"src/tests/*.py" = ["S106", "S107"]
