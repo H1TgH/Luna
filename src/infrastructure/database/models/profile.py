@@ -1,17 +1,12 @@
 from datetime import date
-from enum import StrEnum
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, Date as PGDate, Enum as PGEnum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from core.users.profile.enums import GenderEnum
 from infrastructure.database.database import Base
-
-
-class GenderEnum(StrEnum):
-    MALE = "Male"
-    FEMALE = "Female"
 
 
 class ProfileModel(Base):

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -20,7 +21,7 @@ class AuthService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
 
-    async def create(self, user: UserCreationDTO):
+    async def create(self, user: UserCreationDTO) -> None:
         async with self.uow() as session:
             repository = AuthRepository(session)
 
@@ -28,8 +29,10 @@ class AuthService:
             if existing_user:
                 raise UserAlreadyExistsException("User already exists")
 
-            hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-            user.password = hashed_password
+            hashed_password = await asyncio.to_thread(
+                bcrypt.hashpw, user.password.encode("utf-8"), bcrypt.gensalt()
+            )
+            user.password = hashed_password.decode("utf-8")
 
             await repository.add(user)
 
@@ -38,7 +41,7 @@ class AuthService:
             repository = AuthRepository(session)
 
             user = await repository.get_by_email(creds.email)
-            if not user or not self.verify_password(creds.password, user.password):
+            if not user or not await self.verify_password(creds.password, user.password):
                 raise InvalidCredentialsException("Incorrect email or password")
 
             dto = AuthenticatedUserDTO(id=user.id)
@@ -64,11 +67,15 @@ class AuthService:
         return dto
 
     @staticmethod
-    def verify_password(plain_password: str, hashed_password: str):
-        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    async def verify_password(plain_password: str, hashed_password: str) -> bool:
+        return await asyncio.to_thread(
+            bcrypt.checkpw,
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8")
+        )
 
     @staticmethod
-    def create_token(data: dict[str, Any], expires_delta: timedelta):
+    def create_token(data: dict[str, Any], expires_delta: timedelta) -> str:
         payload = data.copy()
         exp = datetime.now(UTC) + expires_delta
         payload.update({"exp": exp})
@@ -80,7 +87,7 @@ class AuthService:
         )
 
     @staticmethod
-    def verify_token(token: str, token_type: str):
+    def verify_token(token: str, token_type: str) -> dict[str, Any]:
         try:
             payload = jwt.decode(
                 token,
@@ -98,5 +105,5 @@ class AuthService:
         return payload
 
 
-def get_auth_service():
+def get_auth_service() -> AuthService:
     return AuthService(UnitOfWork())

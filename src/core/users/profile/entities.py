@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
 
-from infrastructure.database.models.profile import GenderEnum
+from core.users.profile.enums import GenderEnum
 
 
 @dataclass
