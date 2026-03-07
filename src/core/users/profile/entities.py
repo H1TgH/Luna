@@ -17,7 +17,6 @@ class ProfileCreationDTO:
 @dataclass
 class ProfileReadDTO:
     id: UUID
-    user_id: UUID
     username: str
     first_name: str
     last_name: str

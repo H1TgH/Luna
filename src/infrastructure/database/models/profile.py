@@ -14,15 +14,8 @@ class ProfileModel(Base):
 
     id: Mapped[UUID] = mapped_column(
         PGUUID,
-        primary_key=True,
-        default=uuid4,
-    )
-
-    user_id: Mapped[UUID] = mapped_column(
-        PGUUID,
         ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True,
-        nullable=False,
+        primary_key=True
     )
 
     username: Mapped[str] = mapped_column(

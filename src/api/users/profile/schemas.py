@@ -16,7 +16,6 @@ class ProfileCreationSchema(BaseModel):
 
 class ProfileSchema(BaseModel):
     id: UUID
-    user_id: UUID
     username: str
     first_name: str
     last_name: str

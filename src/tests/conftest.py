@@ -137,7 +137,7 @@ def profile_factory(db_session: AsyncSession) -> Callable:
         gender: str = "Male"
     ) -> ProfileModel:
         profile = ProfileModel(
-            user_id=user_id,
+            id=user_id,
             username=username,
             first_name=first_name,
             last_name=last_name,

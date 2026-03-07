@@ -36,7 +36,6 @@ class ProfileService:
 
             dto = ProfileReadDTO(
                 id=profile.id,
-                user_id=profile.user_id,
                 username=profile.username,
                 first_name=profile.first_name,
                 last_name=profile.last_name,
@@ -58,7 +57,6 @@ class ProfileService:
 
             dto = ProfileReadDTO(
                 id=profile.id,
-                user_id=profile.user_id,
                 username=profile.username,
                 first_name=profile.first_name,
                 last_name=profile.last_name,
