@@ -32,9 +32,17 @@ class SecuritySettings(BaseSettings):
     refresh_ttl: int = Field(alias="REFRESH_TOKEN_EXPIRE_DAYS")
 
 
+class S3Settings(BaseSettings):
+    access_key: str = Field(alias="MINIO_ROOT_USER")
+    secret_key: SecretStr = Field(alias="MINIO_ROOT_PASSWORD")
+    internal_endpoint: str = Field(alias="INTERNAL_ENDPOINT_URL")
+    public_endpoint: str = Field(alias="PUBLIC_ENDPOINT_URL")
+
+
 class Settings(BaseSettings):
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
+    s3: S3Settings = Field(default_factory=S3Settings)
 
 
 settings = Settings()
