@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from infrastructure.database.database import Base
 from infrastructure.database.models.users import UserModel
 from infrastructure.database.models.profile import ProfileModel
+from infrastructure.database.models.posts import PostImageModel, PostModel, PostLikeModel
 from settings import settings
 
 

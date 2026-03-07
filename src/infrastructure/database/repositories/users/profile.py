@@ -12,14 +12,14 @@ class ProfileRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def add(self, data: ProfileCreationDTO, user_id: UUID) -> None:
+    async def add(self, profile: ProfileCreationDTO, user_id: UUID) -> None:
         self.session.add(ProfileModel(
-            username=data.username,
+            username=profile.username,
             user_id=user_id,
-            first_name=data.first_name,
-            last_name=data.last_name,
-            birth_date=data.birth_date,
-            gender=data.gender
+            first_name=profile.first_name,
+            last_name=profile.last_name,
+            birth_date=profile.birth_date,
+            gender=profile.gender
         ))
 
     async def update(self, data: dict[str, Any], user_id: UUID) -> None:
