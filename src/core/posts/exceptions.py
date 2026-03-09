@@ -4,3 +4,7 @@ class PostDoesNotExistException(Exception):
 
 class UnacceptableImageCountException(Exception):
     pass
+
+
+class EmptyPostException(Exception):
+    pass

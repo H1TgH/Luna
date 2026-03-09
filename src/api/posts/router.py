@@ -1,13 +1,14 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
+from api.posts.decorators import handle_post_exceptions
+from api.posts.schemas import PostPageSchema
 from core.posts.entities import PostCreationDTO, UploadImageDTO
 from core.posts.services import PostService, get_post_service
 from core.users.auth.entities import CurrentUserDTO
 from dependencies import get_current_user
-from api.posts.schemas import PostPageSchema
 
 
 posts_router = APIRouter(
@@ -20,6 +21,7 @@ posts_router = APIRouter(
     "/",
     status_code=201
 )
+@handle_post_exceptions
 async def create_post(
     content: str | None = Form(None),
     images: list[UploadFile] | None = File(None),
@@ -48,7 +50,8 @@ async def create_post(
     status_code=200,
     response_model=PostPageSchema
 )
-async def get_user_posts(
+@handle_post_exceptions
+async def get_current_user_posts(
     limit: int = Query(25, ge=1, le=50),
     cursor: datetime | None = Query(None),
     current_user: CurrentUserDTO = Depends(get_current_user),
@@ -69,6 +72,7 @@ async def get_user_posts(
     status_code=200,
     response_model=PostPageSchema
 )
+@handle_post_exceptions
 async def get_user_posts(
     profile_id: UUID,
     limit: int = Query(25, ge=1, le=50),
@@ -90,6 +94,7 @@ async def get_user_posts(
     "/{post_id}",
     status_code=204
 )
+@handle_post_exceptions
 async def delete_post(
     post_id: UUID,
     current_user: CurrentUserDTO = Depends(get_current_user),
@@ -102,6 +107,7 @@ async def delete_post(
     "/{post_id}/like",
     status_code=200
 )
+@handle_post_exceptions
 async def put_like(
     post_id: UUID,
     current_user: CurrentUserDTO = Depends(get_current_user),
@@ -114,6 +120,7 @@ async def put_like(
     "/{post_id}/like",
     status_code=200
 )
+@handle_post_exceptions
 async def remove_like(
     post_id: UUID,
     current_user: CurrentUserDTO = Depends(get_current_user),

@@ -3,8 +3,8 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from core.exceptions import PermissionDeniedException
-from core.posts.entities import PostCreationDTO, PostImageDTO, PostsPageDTO, UploadImageDTO, PostReadDTO
-from core.posts.exceptions import PostDoesNotExistException, UnacceptableImageCountException
+from core.posts.entities import PostCreationDTO, PostImageDTO, PostReadDTO, PostsPageDTO, UploadImageDTO
+from core.posts.exceptions import EmptyPostException, PostDoesNotExistException, UnacceptableImageCountException
 from infrastructure.database.repositories.posts.posts import PostRepository
 from infrastructure.database.uow import UnitOfWork
 from infrastructure.media.images.processor import ImageProcessor
@@ -24,6 +24,9 @@ class PostService:
         author_id: UUID,
         images: list[UploadImageDTO] | None = None
     ) -> None:
+        if not post_data.content and not images:
+            raise EmptyPostException("Post must have content or at least one image")
+
         async with self.uow() as session:
             repository = PostRepository(session)
 

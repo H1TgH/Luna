@@ -1,3 +1,4 @@
+import io
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
@@ -6,12 +7,17 @@ from uuid import UUID
 import bcrypt
 import pytest
 from httpx import ASGITransport, AsyncClient
+from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.posts.services import PostService, get_post_service
 from core.users.auth.services import AuthService, get_auth_service
 from core.users.profile.services import ProfileService, get_profile_service
+from infrastructure.database.models.posts import PostModel
 from infrastructure.database.models.profile import ProfileModel
 from infrastructure.database.models.users import UserModel
+from infrastructure.media.images.processor import ImageProcessor
+from infrastructure.s3.storage import S3Storage
 from main import app
 from settings import settings
 
@@ -31,7 +37,6 @@ async def db_session():
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from infrastructure.database.database import Base
-    from settings import settings
 
     engine = create_async_engine(settings.db.database_url)
     Session = async_sessionmaker(
@@ -67,14 +72,54 @@ def test_profile_service(db_session: AsyncSession):
 
 
 @pytest.fixture
-async def client(test_auth_service, test_profile_service):
+async def test_post_service(db_session: AsyncSession):
+    uow = TestUnitOfWork(db_session)
+    service = PostService(
+        uow=uow,
+        s3_storage=S3Storage(
+            access_key=settings.s3.access_key,
+            secret_key=settings.s3.secret_key.get_secret_value(),
+            bucket_name="testposts",
+            internal_endpoint_url=settings.s3.internal_endpoint,
+            public_endpoint_url=settings.s3.public_endpoint
+        ),
+        image_processor=ImageProcessor()
+    )
+
+    async with service.s3.get_internal_client() as client:
+        try:
+            await client.create_bucket(Bucket="testposts")
+        except client.exceptions.BucketAlreadyOwnedByYou:
+            pass
+
+    yield service
+
+    async with service.s3.get_internal_client() as client:
+        response = await client.list_objects_v2(Bucket="testposts")
+        for obj in response.get("Contents", []):
+            await client.delete_object(Bucket="testposts", Key=obj["Key"])
+        await client.delete_bucket(Bucket="testposts")
+
+
+@pytest.fixture
+async def client(test_auth_service, test_profile_service, test_post_service):
     app.dependency_overrides[get_auth_service] = lambda: test_auth_service
     app.dependency_overrides[get_profile_service] = lambda: test_profile_service
+    app.dependency_overrides[get_post_service] = lambda: test_post_service
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def fake_image_bytes():
+    img = Image.new("RGB", (10, 10), color="blue")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+    return buf.getvalue()
 
 
 @pytest.fixture
@@ -152,6 +197,26 @@ def profile_factory(db_session: AsyncSession) -> Callable:
         return profile
 
     return _create_profile
+
+
+@pytest.fixture
+def post_factory(db_session: AsyncSession) -> Callable:
+    async def _create_post(
+        author_id: UUID,
+        content: str | None = "Hello, World!"
+    ) -> PostModel:
+        post = PostModel(
+            author_id=author_id,
+            content=content
+        )
+
+        db_session.add(post)
+        await db_session.commit()
+        await db_session.refresh(post)
+
+        return post
+
+    return _create_post
 
 
 @pytest.fixture
