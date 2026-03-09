@@ -80,6 +80,7 @@ class PostService:
 
                 post_dtos.append(
                     PostReadDTO(
+                        id=post.id,
                         author_id=post.author_id,
                         content=post.content,
                         images=images,
@@ -125,7 +126,7 @@ class PostService:
                 raise PostDoesNotExistException("Post does not exist")
             if post.author_id != current_user_id:
                 raise PermissionDeniedException("You are not allowed to delete this post")
-            
+
             delete_tasks = []
             for image in post.images:
                 delete_tasks.append(

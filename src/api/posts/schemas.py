@@ -9,6 +9,7 @@ class PostImageSchema(BaseModel):
 
 
 class PostReadSchema(BaseModel):
+    id: UUID
     author_id: UUID
     created_at: datetime
     likes_count: int

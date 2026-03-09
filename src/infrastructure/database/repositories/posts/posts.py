@@ -82,6 +82,7 @@ class PostRepository:
         for post in posts:
             post_dtos.append(
                 PostReadDTO(
+                    id=post.id,
                     author_id=post.author_id,
                     content=post.content,
                     images=[PostImageDTO(object_key=image.object_key, order=image.order) for image in post.images],
@@ -117,7 +118,7 @@ class PostRepository:
                     PostLikeModel.user_id == user_id
                 )
             )
-        
+
     async def is_put_like(self, post_id: UUID, user_id: UUID):
         stmt = select(PostLikeModel).where(
             PostLikeModel.post_id == post_id,

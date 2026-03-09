@@ -24,6 +24,7 @@ class PostCreationDTO:
 
 @dataclass
 class PostReadDTO:
+    id: UUID
     author_id: UUID
     created_at: datetime
     likes_count: int
