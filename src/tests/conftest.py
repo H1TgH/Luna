@@ -1,3 +1,4 @@
+import asyncio
 import io
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -59,6 +60,50 @@ async def db_session():
     await engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def s3_posts() -> S3Storage:
+    return S3Storage(
+        access_key=settings.s3.access_key,
+        secret_key=settings.s3.secret_key.get_secret_value(),
+        bucket_name="testposts",
+        internal_endpoint_url=settings.s3.internal_endpoint,
+        public_endpoint_url=settings.s3.public_endpoint
+    )
+
+
+@pytest.fixture(scope="session")
+def s3_avatars() -> S3Storage:
+    return S3Storage(
+        access_key=settings.s3.access_key,
+        secret_key=settings.s3.secret_key.get_secret_value(),
+        bucket_name="testavatars",
+        internal_endpoint_url=settings.s3.internal_endpoint,
+        public_endpoint_url=settings.s3.public_endpoint
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def create_test_buckets(s3_posts: S3Storage, s3_avatars: S3Storage):
+    for s3 in (s3_posts, s3_avatars):
+        async with s3.get_internal_client() as client:
+            try:
+                await client.create_bucket(Bucket=s3.bucket_name)
+            except client.exceptions.BucketAlreadyOwnedByYou:
+                pass
+
+    yield
+
+    for s3 in (s3_posts, s3_avatars):
+        async with s3.get_internal_client() as client:
+            response = await client.list_objects_v2(Bucket=s3.bucket_name)
+            delete_tasks = [
+                client.delete_object(Bucket=s3.bucket_name, Key=obj["Key"])
+                for obj in response.get("Contents", [])
+            ]
+            await asyncio.gather(*delete_tasks)
+            await client.delete_bucket(Bucket=s3.bucket_name)
+
+
 @pytest.fixture
 def test_auth_service(db_session: AsyncSession):
     uow = TestUnitOfWork(db_session)
@@ -66,60 +111,15 @@ def test_auth_service(db_session: AsyncSession):
 
 
 @pytest.fixture
-async def test_profile_service(db_session: AsyncSession):
+def test_profile_service(db_session: AsyncSession, s3_avatars: S3Storage):
     uow = TestUnitOfWork(db_session)
-    s3 = S3Storage(
-        access_key=settings.s3.access_key,
-        secret_key=settings.s3.secret_key.get_secret_value(),
-        bucket_name="testavatars",
-        internal_endpoint_url=settings.s3.internal_endpoint,
-        public_endpoint_url=settings.s3.public_endpoint
-    )
-    service = ProfileService(uow=uow, s3_storage=s3, image_processor=ImageProcessor())
-
-    async with service.s3.get_internal_client() as client:
-        try:
-            await client.create_bucket(Bucket="testavatars")
-        except client.exceptions.BucketAlreadyOwnedByYou:
-            pass
-
-    yield service
-
-    async with service.s3.get_internal_client() as client:
-        response = await client.list_objects_v2(Bucket="testavatars")
-        for obj in response.get("Contents", []):
-            await client.delete_object(Bucket="testavatars", Key=obj["Key"])
-        await client.delete_bucket(Bucket="testavatars")
+    return ProfileService(uow=uow, s3_storage=s3_avatars, image_processor=ImageProcessor())
 
 
 @pytest.fixture
-async def test_post_service(db_session: AsyncSession):
+def test_post_service(db_session: AsyncSession, s3_posts: S3Storage):
     uow = TestUnitOfWork(db_session)
-    service = PostService(
-        uow=uow,
-        s3_storage=S3Storage(
-            access_key=settings.s3.access_key,
-            secret_key=settings.s3.secret_key.get_secret_value(),
-            bucket_name="testposts",
-            internal_endpoint_url=settings.s3.internal_endpoint,
-            public_endpoint_url=settings.s3.public_endpoint
-        ),
-        image_processor=ImageProcessor()
-    )
-
-    async with service.s3.get_internal_client() as client:
-        try:
-            await client.create_bucket(Bucket="testposts")
-        except client.exceptions.BucketAlreadyOwnedByYou:
-            pass
-
-    yield service
-
-    async with service.s3.get_internal_client() as client:
-        response = await client.list_objects_v2(Bucket="testposts")
-        for obj in response.get("Contents", []):
-            await client.delete_object(Bucket="testposts", Key=obj["Key"])
-        await client.delete_bucket(Bucket="testposts")
+    return PostService(uow=uow, s3_storage=s3_posts, image_processor=ImageProcessor())
 
 
 @pytest.fixture
