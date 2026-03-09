@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from infrastructure.database.models.profile import GenderEnum
+from core.users.profile.enums import GenderEnum
 
 
 class ProfileCreationSchema(BaseModel):
@@ -21,7 +21,7 @@ class ProfileSchema(BaseModel):
     last_name: str
     gender: GenderEnum
     birth_date: date
-    avatar_uploaded: bool
+    avatar_url: str | None
     status: str | None
 
 

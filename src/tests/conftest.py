@@ -66,9 +66,30 @@ def test_auth_service(db_session: AsyncSession):
 
 
 @pytest.fixture
-def test_profile_service(db_session: AsyncSession):
+async def test_profile_service(db_session: AsyncSession):
     uow = TestUnitOfWork(db_session)
-    return ProfileService(uow)
+    s3 = S3Storage(
+        access_key=settings.s3.access_key,
+        secret_key=settings.s3.secret_key.get_secret_value(),
+        bucket_name="testavatars",
+        internal_endpoint_url=settings.s3.internal_endpoint,
+        public_endpoint_url=settings.s3.public_endpoint
+    )
+    service = ProfileService(uow=uow, s3_storage=s3, image_processor=ImageProcessor())
+
+    async with service.s3.get_internal_client() as client:
+        try:
+            await client.create_bucket(Bucket="testavatars")
+        except client.exceptions.BucketAlreadyOwnedByYou:
+            pass
+
+    yield service
+
+    async with service.s3.get_internal_client() as client:
+        response = await client.list_objects_v2(Bucket="testavatars")
+        for obj in response.get("Contents", []):
+            await client.delete_object(Bucket="testavatars", Key=obj["Key"])
+        await client.delete_bucket(Bucket="testavatars")
 
 
 @pytest.fixture

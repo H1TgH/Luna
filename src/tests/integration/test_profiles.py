@@ -84,6 +84,14 @@ async def test_get_my_profile(client, test_profile, auth_header):
 
 
 @pytest.mark.asyncio
+async def test_get_my_profile_avatar_url_is_none_by_default(client, test_profile, auth_header):
+    response = await client.get("/api/v1/user/profile/me", headers=auth_header)
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["avatar_url"] is None
+
+
+@pytest.mark.asyncio
 async def test_get_my_profile_not_found(client, auth_header):
     response = await client.get("/api/v1/user/profile/me", headers=auth_header)
 
@@ -152,3 +160,49 @@ async def test_update_profile_empty_payload(client, test_profile, auth_header):
     response = await client.patch("/api/v1/user/profile/me", json={}, headers=auth_header)
 
     assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.asyncio
+async def test_upload_avatar(client, test_profile, auth_header, fake_image_bytes):
+    response = await client.post(
+        "/api/v1/user/profile/me/avatar",
+        files={"avatar": ("avatar.jpg", fake_image_bytes, "image/jpeg")},
+        headers=auth_header
+    )
+
+    assert response.status_code == HTTPStatus.NO_CONTENT
+
+
+@pytest.mark.asyncio
+async def test_upload_avatar_sets_url(client, test_profile, auth_header, fake_image_bytes):
+    await client.post(
+        "/api/v1/user/profile/me/avatar",
+        files={"avatar": ("avatar.jpg", fake_image_bytes, "image/jpeg")},
+        headers=auth_header
+    )
+
+    response = await client.get("/api/v1/user/profile/me", headers=auth_header)
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["avatar_url"] is not None
+
+
+@pytest.mark.asyncio
+async def test_upload_avatar_no_profile(client, auth_header, fake_image_bytes):
+    response = await client.post(
+        "/api/v1/user/profile/me/avatar",
+        files={"avatar": ("avatar.jpg", fake_image_bytes, "image/jpeg")},
+        headers=auth_header
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_upload_avatar_unauthorized(client, test_profile, fake_image_bytes):
+    response = await client.post(
+        "/api/v1/user/profile/me/avatar",
+        files={"avatar": ("avatar.jpg", fake_image_bytes, "image/jpeg")}
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED

@@ -22,7 +22,7 @@ class ProfileReadDTO:
     last_name: str
     gender: GenderEnum
     birth_date: date
-    avatar_uploaded: bool
+    avatar_url: str | None
     status: str | None
 
 

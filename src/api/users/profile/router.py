@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from api.users.profile.decorators import handle_profile_exceptions
 from api.users.profile.schemas import ProfileCreationSchema, ProfileSchema, ProfileUpdateSchema
@@ -50,6 +50,39 @@ async def get_my_profile(
     return ProfileSchema(**asdict(profile))
 
 
+@profile_router.patch(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+@handle_profile_exceptions
+async def update_profile(
+    data: ProfileUpdateSchema,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
+):
+    dto = ProfileUpdateDTO(**data.model_dump())
+
+    await service.update(dto, current_user)
+
+
+@profile_router.post(
+    "/me/avatar",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+@handle_profile_exceptions
+async def upload_avatar(
+    avatar: UploadFile = File(...),
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
+):
+    await service.upload_avatar(
+        file_name=avatar.filename,
+        data=avatar.file,
+        content_type=avatar.content_type,
+        user=current_user
+    )
+
+
 @profile_router.get(
     "/{username}",
     status_code=status.HTTP_200_OK,
@@ -64,18 +97,3 @@ async def get_profile(
     profile = await service.get_by_username(username)
 
     return ProfileSchema(**asdict(profile))
-
-
-@profile_router.patch(
-    "/me",
-    status_code=status.HTTP_204_NO_CONTENT
-)
-@handle_profile_exceptions
-async def update_profile(
-    data: ProfileUpdateSchema,
-    current_user: CurrentUserDTO = Depends(get_current_user),
-    service: ProfileService = Depends(get_profile_service)
-):
-    dto = ProfileUpdateDTO(**data.model_dump())
-
-    await service.update(dto, current_user)

@@ -1,4 +1,6 @@
+import asyncio
 from dataclasses import asdict
+from typing import BinaryIO
 from uuid import UUID
 
 from core.users.auth.entities import CurrentUserDTO
@@ -6,11 +8,16 @@ from core.users.profile.entities import ProfileCreationDTO, ProfileReadDTO, Prof
 from core.users.profile.exceptions import ProfileAlreadyExistsException, ProfileDoesNotExistException
 from infrastructure.database.repositories.users.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
+from infrastructure.media.images.processor import ImageProcessor
+from infrastructure.s3.storage import S3Storage
+from settings import settings
 
 
 class ProfileService:
-    def __init__(self, uow: UnitOfWork):
+    def __init__(self, uow: UnitOfWork, s3_storage: S3Storage, image_processor: ImageProcessor):
         self.uow = uow
+        self.s3 = s3_storage
+        self.image_processor = image_processor
 
     async def create(self, data: ProfileCreationDTO, user: CurrentUserDTO) -> None:
         async with self.uow() as session:
@@ -41,7 +48,7 @@ class ProfileService:
                 last_name=profile.last_name,
                 birth_date=profile.birth_date,
                 gender=profile.gender,
-                avatar_uploaded=profile.avatar_uploaded,
+                avatar_url=profile.avatar_url,
                 status=profile.status
             )
 
@@ -62,7 +69,7 @@ class ProfileService:
                 last_name=profile.last_name,
                 birth_date=profile.birth_date,
                 gender=profile.gender,
-                avatar_uploaded=profile.avatar_uploaded,
+                avatar_url=profile.avatar_url,
                 status=profile.status
             )
 
@@ -86,6 +93,32 @@ class ProfileService:
 
             await repository.update(update_data, user.id)
 
+    async def upload_avatar(self, file_name: str, data: BinaryIO, content_type: str, user: CurrentUserDTO) -> None:
+        async with self.uow() as session:
+            repository = ProfileRepository(session)
+
+            profile = await repository.get_by_user_id(user.id)
+            if profile is None:
+                raise ProfileDoesNotExistException("Profile does not exist")
+
+            converted = await asyncio.to_thread(self.image_processor.convert_to_webp, data)
+            object_key = f"{user.id}.webp"
+
+            await self.s3.upload(object_key, converted, "image/webp")
+
+            avatar_url = f"{self.s3.public_endpoint}/{self.s3.bucket_name}/{object_key}"
+            await repository.update({"avatar_url": avatar_url}, user.id)
+
 
 def get_profile_service():
-    return ProfileService(UnitOfWork())
+    return ProfileService(
+        uow=UnitOfWork(),
+        s3_storage=S3Storage(
+            access_key=settings.s3.access_key,
+            secret_key=settings.s3.secret_key.get_secret_value(),
+            bucket_name="avatars",
+            internal_endpoint_url=settings.s3.internal_endpoint,
+            public_endpoint_url=settings.s3.public_endpoint
+        ),
+        image_processor=ImageProcessor()
+    )

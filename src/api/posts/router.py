@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from api.posts.decorators import handle_post_exceptions
-from api.posts.schemas import PostPageSchema
+from api.posts.schemas import PostPageSchema, PostReadSchema
 from core.posts.entities import PostCreationDTO, UploadImageDTO
 from core.posts.services import PostService, get_post_service
 from core.users.auth.entities import CurrentUserDTO
@@ -68,7 +68,7 @@ async def get_current_user_posts(
 
 
 @posts_router.get(
-    "/{profile_id}",
+    "/user/{profile_id}",
     status_code=200,
     response_model=PostPageSchema
 )
@@ -88,6 +88,20 @@ async def get_user_posts(
     )
 
     return result
+
+
+@posts_router.get(
+    "/{post_id}",
+    status_code=200,
+    response_model=PostReadSchema
+)
+@handle_post_exceptions
+async def get_post(
+    post_id: UUID,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: PostService = Depends(get_post_service)
+):
+    return await service.get_post_by_id(post_id, current_user.id)
 
 
 @posts_router.delete(

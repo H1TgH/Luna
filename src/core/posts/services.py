@@ -58,6 +58,29 @@ class PostService:
 
             await repository.add(author_id, post_data, converted_images)
 
+    async def get_post_by_id(self, post_id: UUID, current_user_id: UUID) -> PostReadDTO:
+        async with self.uow() as session:
+            repository = PostRepository(session)
+
+            post = await repository.get_by_id(post_id, current_user_id)
+            if post is None:
+                raise PostDoesNotExistException("Post does not exist")
+
+            images = []
+            for image in post.images:
+                url = f"{self.s3.public_endpoint}/{self.s3.bucket_name}/{image.object_key}"
+                images.append(PostImageDTO(object_key=url, order=image.order))
+
+            return PostReadDTO(
+                id=post.id,
+                author_id=post.author_id,
+                content=post.content,
+                images=images,
+                created_at=post.created_at,
+                likes_count=post.likes_count,
+                is_current_user_likes=post.is_current_user_likes
+            )
+
     async def get_user_posts(
         self,
         profile_id: UUID,
@@ -116,7 +139,7 @@ class PostService:
 
             post = await repository.get_post_or_none(post_id)
             if post is None:
-                raise PostDoesNotExistException("Post does not exis")
+                raise PostDoesNotExistException("Post does not exist")
             if await repository.is_put_like(post_id, current_user_id):
                 await repository.delete_like(post_id, current_user_id)
 

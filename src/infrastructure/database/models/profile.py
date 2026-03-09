@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date as PGDate, Enum as PGEnum, ForeignKey, String
+from sqlalchemy import Date as PGDate, Enum as PGEnum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -49,10 +49,9 @@ class ProfileModel(Base):
         nullable=True,
     )
 
-    avatar_uploaded: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        server_default="false",
+    avatar_url: Mapped[str] = mapped_column(
+        String,
+        nullable=True,
     )
 
     user: Mapped["UserModel"] = relationship(

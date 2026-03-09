@@ -94,6 +94,46 @@ class PostRepository:
 
         return post_dtos
 
+    async def get_by_id(
+        self,
+        post_id: UUID,
+        current_user_id: UUID
+    ) -> PostReadDTO:
+        stmt = (
+            select(PostModel)
+            .where(PostModel.id == post_id)
+            .options(selectinload(PostModel.images))
+        )
+        result = await self.session.execute(stmt)
+        post = result.scalar_one_or_none()
+
+        if post is None:
+            return None
+
+        likes_stmt = (
+            select(func.count(PostLikeModel.user_id))
+            .where(PostLikeModel.post_id == post_id)
+        )
+        likes_result = await self.session.execute(likes_stmt)
+        likes_count = likes_result.scalar() or 0
+
+        user_like_stmt = select(PostLikeModel).where(
+            PostLikeModel.post_id == post_id,
+            PostLikeModel.user_id == current_user_id
+        )
+        user_like_result = await self.session.execute(user_like_stmt)
+        is_liked = user_like_result.scalar_one_or_none() is not None
+
+        return PostReadDTO(
+            id=post.id,
+            author_id=post.author_id,
+            content=post.content,
+            images=[PostImageDTO(object_key=image.object_key, order=image.order) for image in post.images],
+            created_at=post.created_at,
+            likes_count=likes_count,
+            is_current_user_likes=is_liked
+        )
+
     async def get_post_or_none(self, post_id: UUID):
         stmt = (
             select(PostModel)

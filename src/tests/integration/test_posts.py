@@ -160,6 +160,80 @@ async def test_create_post_unauthorized(
 
 
 @pytest.mark.asyncio
+async def test_get_post(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    post_factory: Callable,
+    auth_header: dict[str, str]
+):
+    post: PostModel = await post_factory(author_id=test_profile.id)
+
+    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_header)
+
+    assert response.status_code == http.HTTPStatus.OK
+    assert response.json()["id"] == str(post.id)
+    assert response.json()["author_id"] == str(test_profile.id)
+    assert response.json()["content"] == post.content
+
+
+@pytest.mark.asyncio
+async def test_get_post_likes_count_initial(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    post_factory: Callable,
+    auth_header: dict[str, str]
+):
+    post: PostModel = await post_factory(author_id=test_profile.id)
+
+    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_header)
+
+    assert response.status_code == http.HTTPStatus.OK
+    assert response.json()["likes_count"] == 0
+    assert response.json()["is_current_user_likes"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_post_is_current_user_likes_true(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    post_factory: Callable,
+    auth_header: dict[str, str]
+):
+    post: PostModel = await post_factory(author_id=test_profile.id)
+    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+
+    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_header)
+
+    assert response.status_code == http.HTTPStatus.OK
+    assert response.json()["likes_count"] == 1
+    assert response.json()["is_current_user_likes"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_post_not_found(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str]
+):
+    response: Response = await client.get(f"/api/v1/posts/{uuid4()}", headers=auth_header)
+
+    assert response.status_code == http.HTTPStatus.NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_get_post_unauthorized(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    post_factory: Callable
+):
+    post: PostModel = await post_factory(author_id=test_profile.id)
+
+    response: Response = await client.get(f"/api/v1/posts/{post.id}")
+
+    assert response.status_code == http.HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.asyncio
 async def test_get_my_posts_empty(
     client: AsyncClient,
     test_profile: ProfileModel,
@@ -229,7 +303,7 @@ async def test_get_user_posts(
     await post_factory(author_id=other_profile.id)
     await post_factory(author_id=other_profile.id)
 
-    response: Response = await client.get(f"/api/v1/posts/{other_profile.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_header)
 
     assert response.status_code == http.HTTPStatus.OK
     assert len(response.json()["posts"]) == 2
@@ -246,7 +320,7 @@ async def test_get_user_posts_empty(
     other_user: UserModel = await user_factory(email="other@example.com")
     other_profile: ProfileModel = await profile_factory(user_id=other_user.id, username="other")
 
-    response: Response = await client.get(f"/api/v1/posts/{other_profile.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_header)
 
     assert response.status_code == http.HTTPStatus.OK
     assert response.json()["posts"] == []
@@ -266,7 +340,7 @@ async def test_get_user_posts_does_not_return_other_users_posts(
     await post_factory(author_id=test_profile.id)
     await post_factory(author_id=other_profile.id)
 
-    response: Response = await client.get(f"/api/v1/posts/{other_profile.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_header)
 
     assert response.status_code == http.HTTPStatus.OK
     assert len(response.json()["posts"]) == 1
@@ -277,7 +351,7 @@ async def test_get_user_posts_unauthorized(
     client: AsyncClient,
     test_profile: ProfileModel
 ):
-    response: Response = await client.get(f"/api/v1/posts/{test_profile.id}")
+    response: Response = await client.get(f"/api/v1/posts/user/{test_profile.id}")
 
     assert response.status_code == http.HTTPStatus.UNAUTHORIZED
 
