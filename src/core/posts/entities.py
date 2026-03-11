@@ -38,3 +38,10 @@ class PostsPageDTO:
     posts: list[PostReadDTO]
     next_cursor: datetime | None
     has_next: bool
+
+
+@dataclass
+class ImageDTO:
+    post_id: UUID
+    object_key: str
+    created_at: datetime

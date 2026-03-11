@@ -23,3 +23,9 @@ class PostPageSchema(BaseModel):
     posts: list[PostReadSchema]
     next_cursor: datetime | None
     has_next: bool
+
+
+class ImageSchema(BaseModel):
+    post_id: UUID
+    object_key: str
+    created_at: datetime

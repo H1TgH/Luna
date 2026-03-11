@@ -55,3 +55,6 @@ class S3Storage:
                 Bucket=self.bucket_name,
                 Key=object_key
             )
+
+    def get_file_url(self, object_key):
+        return f"{self.public_endpoint}/{self.bucket_name}/{object_key}"

@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from core.posts.entities import PostCreationDTO, PostImageDTO, PostReadDTO
+from core.posts.entities import ImageDTO, PostCreationDTO, PostImageDTO, PostReadDTO
 from infrastructure.database.models.posts import PostImageModel, PostLikeModel, PostModel
 
 
@@ -133,6 +133,44 @@ class PostRepository:
             likes_count=likes_count,
             is_current_user_likes=is_liked
         )
+
+    async def get_images(
+        self,
+        profile_id: UUID,
+        cursor: datetime | None = None,
+        limit: int = 25
+    ) -> list[ImageDTO]:
+
+        stmt = (
+            select(PostImageModel, PostModel.created_at)
+            .join(PostModel, PostImageModel.post_id == PostModel.id)
+            .where(PostModel.author_id == profile_id)
+        )
+
+        if cursor:
+            stmt = stmt.where(PostModel.created_at < cursor)
+
+        stmt = (
+            stmt
+            .order_by(PostModel.created_at.desc(), PostImageModel.order)
+            .limit(limit)
+        )
+
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        images = []
+
+        for image, created_at in rows:
+            images.append(
+                ImageDTO(
+                    post_id=image.post_id,
+                    object_key=image.object_key,
+                    created_at=created_at
+                )
+            )
+
+        return images
 
     async def get_post_or_none(self, post_id: UUID):
         stmt = (

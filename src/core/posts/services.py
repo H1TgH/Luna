@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from core.exceptions import PermissionDeniedException
-from core.posts.entities import PostCreationDTO, PostImageDTO, PostReadDTO, PostsPageDTO, UploadImageDTO
+from core.posts.entities import ImageDTO, PostCreationDTO, PostImageDTO, PostReadDTO, PostsPageDTO, UploadImageDTO
 from core.posts.exceptions import EmptyPostException, PostDoesNotExistException, UnacceptableImageCountException
 from infrastructure.database.repositories.posts.posts import PostRepository
 from infrastructure.database.uow import UnitOfWork
@@ -68,7 +68,7 @@ class PostService:
 
             images = []
             for image in post.images:
-                url = f"{self.s3.public_endpoint}/{self.s3.bucket_name}/{image.object_key}"
+                url = self.s3.get_file_url(image.object_key)
                 images.append(PostImageDTO(object_key=url, order=image.order))
 
             return PostReadDTO(
@@ -101,7 +101,7 @@ class PostService:
             for post in posts:
                 images = []
                 for image in post.images:
-                    url = f"{self.s3.public_endpoint}/{self.s3.bucket_name}/{image.object_key}"
+                    url = self.s3.get_file_url(image.object_key)
                     images.append(PostImageDTO(object_key=url, order=image.order))
 
                 post_dtos.append(
@@ -121,6 +121,35 @@ class PostService:
                 has_next=has_next,
                 next_cursor=next_cursor
             )
+
+    async def get_images(
+        self,
+        profile_id: UUID,
+        cursor: datetime | None = None,
+        limit: int = 25
+    ) -> list[ImageDTO]:
+
+        async with self.uow() as session:
+            repository = PostRepository(session)
+
+            images = await repository.get_images(
+                profile_id=profile_id,
+                cursor=cursor,
+                limit=limit
+            )
+
+            result = []
+
+            for image in images:
+                result.append(
+                    ImageDTO(
+                        post_id=image.post_id,
+                        created_at=image.created_at,
+                        object_key=self.s3.get_file_url(image.object_key)
+                    )
+                )
+
+            return result
 
     async def put_like(self, post_id: UUID, current_user_id: UUID) -> None:
         async with self.uow() as session:

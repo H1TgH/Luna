@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from api.posts.decorators import handle_post_exceptions
-from api.posts.schemas import PostPageSchema, PostReadSchema
+from api.posts.schemas import ImageSchema, PostPageSchema, PostReadSchema
 from core.posts.entities import PostCreationDTO, UploadImageDTO
 from core.posts.services import PostService, get_post_service
 from core.users.auth.entities import CurrentUserDTO
@@ -88,6 +88,25 @@ async def get_user_posts(
     )
 
     return result
+
+
+@posts_router.get(
+    "/images/{profile_id}",
+    status_code=200,
+    response_model=list[ImageSchema]
+)
+async def get_user_images(
+    profile_id: UUID,
+    cursor: datetime | None = None,
+    limit: int = 25,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: PostService = Depends(get_post_service)
+):
+    return await service.get_images(
+        profile_id=profile_id,
+        cursor=cursor,
+        limit=limit
+    )
 
 
 @posts_router.get(
