@@ -1,13 +1,24 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import ProfilePage from './pages/ProfilePage'
+import RootRedirect from './pages/Rootredirect'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/login" replace />,
+    element: <ProtectedRoute />,
+    children: [
+      {
+        index: true,
+        element: <RootRedirect />,
+      },
+      {
+        path: ':username',
+        element: <ProfilePage />,
+      },
+    ],
   },
   {
     path: '/register',
@@ -16,14 +27,5 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
-  },
-  {
-    element: <ProtectedRoute />,
-    children: [
-      {
-        path: '/:username',
-        element: <ProfilePage />,
-      },
-    ],
   },
 ])

@@ -32,26 +32,73 @@ function ImageLightbox({ state, onClose, onNav }: {
   onClose: () => void
   onNav: (dir: 1 | -1) => void
 }) {
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const isDragging = useRef(false)
+  const dragStart = useRef({ x: 0, y: 0 })
+  const panStart = useRef({ x: 0, y: 0 })
+
+  // Reset zoom/pan when switching images
+  useEffect(() => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }, [state.index])
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
       if (e.key === 'ArrowRight') onNav(1)
       if (e.key === 'ArrowLeft') onNav(-1)
     }
+    const handleWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      setZoom((z) => {
+        const next = z * (e.deltaY < 0 ? 1.12 : 0.88)
+        return Math.min(Math.max(next, 1), 6)
+      })
+    }
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      window.removeEventListener('keydown', handler)
+      window.removeEventListener('wheel', handleWheel)
+    }
   }, [onClose, onNav])
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return
+    e.preventDefault()
+    isDragging.current = true
+    dragStart.current = { x: e.clientX, y: e.clientY }
+    panStart.current = { ...pan }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return
+    setPan({
+      x: panStart.current.x + (e.clientX - dragStart.current.x),
+      y: panStart.current.y + (e.clientY - dragStart.current.y),
+    })
+  }
+
+  const handleMouseUp = () => { isDragging.current = false }
 
   const hasMultiple = state.urls.length > 1
 
   return (
     <div
-      onClick={onClose}
+      onClick={zoom <= 1 ? onClose : undefined}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(3,5,15,0.94)',
         backdropFilter: 'blur(12px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: zoom > 1 ? (isDragging.current ? 'grabbing' : 'grab') : 'default',
+        overflow: 'hidden',
       }}
     >
       <button
@@ -60,7 +107,7 @@ function ImageLightbox({ state, onClose, onNav }: {
           position: 'absolute', top: '20px', right: '24px',
           background: 'rgba(255,255,255,0.07)', border: 'none',
           borderRadius: '50%', width: '40px', height: '40px',
-          cursor: 'pointer', color: '#e8ecf8',
+          cursor: 'pointer', color: '#e8ecf8', zIndex: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'background 0.2s',
         }}
@@ -72,14 +119,25 @@ function ImageLightbox({ state, onClose, onNav }: {
         </svg>
       </button>
 
-      {hasMultiple && (
+      {zoom > 1 && (
+        <div style={{
+          position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.45)', borderRadius: '20px', padding: '4px 12px',
+          color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontFamily: "'Outfit', sans-serif",
+          pointerEvents: 'none', zIndex: 10,
+        }}>
+          {Math.round(zoom * 100)}%
+        </div>
+      )}
+
+      {hasMultiple && zoom <= 1 && (
         <>
           <button
             onClick={(e) => { e.stopPropagation(); onNav(-1) }}
             style={{
               position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)',
               background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '50%',
-              width: '44px', height: '44px', cursor: 'pointer', color: '#e8ecf8',
+              width: '44px', height: '44px', cursor: 'pointer', color: '#e8ecf8', zIndex: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'background 0.2s', opacity: state.index === 0 ? 0.3 : 1,
             }}
@@ -96,7 +154,7 @@ function ImageLightbox({ state, onClose, onNav }: {
             style={{
               position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)',
               background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '50%',
-              width: '44px', height: '44px', cursor: 'pointer', color: '#e8ecf8',
+              width: '44px', height: '44px', cursor: 'pointer', color: '#e8ecf8', zIndex: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'background 0.2s', opacity: state.index === state.urls.length - 1 ? 0.3 : 1,
             }}
@@ -113,19 +171,24 @@ function ImageLightbox({ state, onClose, onNav }: {
       <img
         src={state.urls[state.index]}
         alt=""
+        onMouseDown={handleMouseDown}
         onClick={(e) => e.stopPropagation()}
+        draggable={false}
         style={{
           maxWidth: 'min(90vw, 900px)', maxHeight: '88vh',
-          objectFit: 'contain', borderRadius: '10px',
+          objectFit: 'contain', borderRadius: zoom > 1 ? '4px' : '10px',
           boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
           userSelect: 'none',
+          transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+          transition: isDragging.current ? 'none' : 'transform 0.15s ease',
+          cursor: zoom > 1 ? 'grab' : 'default',
         }}
       />
 
-      {hasMultiple && (
+      {hasMultiple && zoom <= 1 && (
         <div style={{
           position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', gap: '6px',
+          display: 'flex', gap: '6px', zIndex: 10,
         }}>
           {state.urls.map((_, i) => (
             <div key={i} style={{
@@ -380,17 +443,35 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  const MAX_IMAGES = 10
+
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value)
     e.target.style.height = 'auto'
     e.target.style.height = e.target.scrollHeight + 'px'
   }
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = (files: FileList | File[] | null) => {
     if (!files) return
-    const newFiles = Array.from(files).slice(0, 4 - images.length)
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    const canAdd = MAX_IMAGES - images.length
+    if (canAdd <= 0) return
+    const newFiles = arr.slice(0, canAdd)
     setImages((p) => [...p, ...newFiles])
     setPreviews((p) => [...p, ...newFiles.map((f) => URL.createObjectURL(f))])
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items)
+    const imageFiles = items
+      .filter((item) => item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null)
+    if (imageFiles.length > 0) {
+      e.preventDefault()
+      if (!expanded) setExpanded(true)
+      handleFiles(imageFiles)
+    }
   }
 
   const removeImage = (i: number) => {
@@ -437,6 +518,7 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
         value={content}
         onFocus={() => setExpanded(true)}
         onChange={handleTextareaChange}
+        onPaste={handlePaste}
         style={{
           width: '100%', background: 'none', border: 'none', outline: 'none',
           resize: 'none', color: '#d4d8ef', fontSize: '15px',
@@ -474,21 +556,21 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
             <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={(e) => handleFiles(e.target.files)} />
             <button
               onClick={() => fileRef.current?.click()}
-              disabled={images.length >= 4}
+              disabled={images.length >= MAX_IMAGES}
               style={{
                 background: 'none', border: 'none',
-                cursor: images.length >= 4 ? 'default' : 'pointer',
-                color: images.length >= 4 ? 'rgba(107,114,156,0.22)' : 'rgba(107,114,156,0.55)',
+                cursor: images.length >= MAX_IMAGES ? 'default' : 'pointer',
+                color: images.length >= MAX_IMAGES ? 'rgba(107,114,156,0.22)' : 'rgba(107,114,156,0.55)',
                 padding: '5px', borderRadius: '7px', display: 'flex', alignItems: 'center',
                 transition: 'color 0.2s, background 0.2s',
               }}
               onMouseEnter={(e) => {
-                if (images.length >= 4) return
+                if (images.length >= MAX_IMAGES) return
                 e.currentTarget.style.color = '#8b7fe8'
                 e.currentTarget.style.background = 'rgba(139,127,232,0.1)'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = images.length >= 4 ? 'rgba(107,114,156,0.22)' : 'rgba(107,114,156,0.55)'
+                e.currentTarget.style.color = images.length >= MAX_IMAGES ? 'rgba(107,114,156,0.22)' : 'rgba(107,114,156,0.55)'
                 e.currentTarget.style.background = 'none'
               }}
             >
