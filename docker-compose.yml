@@ -61,6 +61,22 @@ services:
       - ".env"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  
+  minio-init:
+    image: minio/mc
+    env_file:
+      - ".env"
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./minio_init.sh:/minio_init.sh
+    entrypoint: /bin/sh /minio_init.sh
 
   frontend:
     container_name: luna_frontend
