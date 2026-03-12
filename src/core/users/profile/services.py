@@ -93,7 +93,13 @@ class ProfileService:
 
             await repository.update(update_data, user.id)
 
-    async def upload_avatar(self, file_name: str, data: BinaryIO, content_type: str, user: CurrentUserDTO) -> None:
+    async def upload_avatar(
+        self,
+        file_name: str,
+        data: BinaryIO,
+        content_type: str,
+        user: CurrentUserDTO
+    ) -> None:
         async with self.uow() as session:
             repository = ProfileRepository(session)
 
@@ -108,6 +114,34 @@ class ProfileService:
 
             avatar_url = f"{self.s3.public_endpoint}/{self.s3.bucket_name}/{object_key}"
             await repository.update({"avatar_url": avatar_url}, user.id)
+
+    async def search(
+        self,
+        query: str,
+        offset: int = 0,
+        limit: int = 15
+    ) -> list[ProfileReadDTO]:
+        async with self.uow() as session:
+            repository = ProfileRepository(session)
+
+            profiles = await repository.search(query=query, limit=limit, offset=offset)
+
+            if not profiles:
+                return []
+
+            return [
+                ProfileReadDTO(
+                    id=p.id,
+                    username=p.username,
+                    first_name=p.first_name,
+                    last_name=p.last_name,
+                    birth_date=p.birth_date,
+                    gender=p.gender,
+                    avatar_url=p.avatar_url,
+                    status=p.status
+                )
+                for p in profiles
+            ]
 
 
 def get_profile_service():

@@ -38,7 +38,6 @@ function ImageLightbox({ state, onClose, onNav }: {
   const dragStart = useRef({ x: 0, y: 0 })
   const panStart = useRef({ x: 0, y: 0 })
 
-  // Reset zoom/pan when switching images
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
@@ -423,9 +422,9 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
           fontFamily: "'Outfit', sans-serif",
         }}>
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path d="M2.5 9.5V11a1 1 0 001 1h8a1 1 0 001-1V7M12.5 5.5V4a1 1 0 00-1-1h-8a1 1 0 00-1 1v3"
+            <path d="M11.5 4.5H4a1 1 0 00-1 1V7M3.5 10.5H11a1 1 0 001-1V8"
               stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M10 3.5l2.5 2-2.5 2M5 11.5l-2.5-2 2.5-2"
+            <path d="M9.5 2.5l2.5 2-2.5 2M5.5 8.5l-2.5 2 2.5 2"
               stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
@@ -851,7 +850,8 @@ export default function ProfilePage() {
     <div style={{ minHeight: '100vh', background: '#06091a', color: '#e8ecf8' }}>
       <Header />
 
-      <div style={{ maxWidth: '680px', margin: '0 auto', padding: '36px 24px 80px' }}>
+      {/* ↓ Widened from 680px to 860px */}
+      <div style={{ maxWidth: '860px', margin: '0 auto', padding: '36px 32px 80px' }}>
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: '22px',
           marginBottom: '32px', paddingBottom: '28px',

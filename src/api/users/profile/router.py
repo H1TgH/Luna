@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from api.users.profile.decorators import handle_profile_exceptions
 from api.users.profile.schemas import ProfileCreationSchema, ProfileSchema, ProfileUpdateSchema
@@ -48,6 +48,23 @@ async def get_my_profile(
     profile = await service.get_by_user_id(current_user.id)
 
     return ProfileSchema(**asdict(profile))
+
+
+@profile_router.get(
+    "/search",
+    status_code=status.HTTP_200_OK,
+    response_model=list[ProfileSchema]
+)
+async def profiles_search(
+    query: str = Query(..., min_length=1, max_length=50),
+    limit: int = Query(15, le=30),
+    offset: int = Query(0),
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
+):
+    profiles = await service.search(query=query, limit=limit, offset=offset)
+
+    return [ProfileSchema(**asdict(p)) for p in profiles]
 
 
 @profile_router.patch(

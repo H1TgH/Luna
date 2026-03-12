@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.users.profile.entities import ProfileCreationDTO
@@ -40,3 +40,38 @@ class ProfileRepository:
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 15,
+        offset: int = 0,
+        threshold: float = 0.25
+    ) -> list[ProfileModel]:
+        query_lower = query.lower()
+
+        stmt = (
+            select(ProfileModel)
+            .where(
+                or_(
+                    func.similarity(ProfileModel.username, query) > threshold,
+                    func.similarity(ProfileModel.first_name, query) > threshold,
+                    func.similarity(ProfileModel.last_name, query) > threshold,
+                    ProfileModel.username.ilike(f"%{query}%"),
+                    ProfileModel.first_name.ilike(f"%{query}%"),
+                    ProfileModel.last_name.ilike(f"%{query}%"),
+                )
+            )
+            .order_by(
+                func.greatest(
+                    func.similarity(func.lower(ProfileModel.username), query_lower),
+                    func.similarity(func.lower(ProfileModel.first_name), query_lower),
+                    func.similarity(func.lower(ProfileModel.last_name), query_lower),
+                ).desc()
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+        results = await self.session.execute(stmt)
+
+        return results.scalars().all()
