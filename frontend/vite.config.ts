@@ -11,9 +11,16 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+
+    allowedHosts: [
+      'luna-sc.ru',
+      'www.luna-sc.ru'
+    ],
+
     watch: {
       usePolling: true,
     },
+
     proxy: {
       '/api': {
         target: 'http://fastapi_app:8000',
