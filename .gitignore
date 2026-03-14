@@ -262,3 +262,5 @@ vendor/pkg/
 pyenv
 Vagrantfile
 node_modules
+
+nginx/ssl/*

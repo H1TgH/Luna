@@ -57,4 +57,4 @@ class S3Storage:
             )
 
     def get_file_url(self, object_key):
-        return f"{self.public_endpoint}/{self.bucket_name}/{object_key}"
+        return f"{self.public_endpoint}/media/{self.bucket_name}/{object_key}"

@@ -1,0 +1,23 @@
+services:
+
+  nginx:
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - fastapi_app
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  fastapi_app:
+    ports:
+      - "8000:8000"
+
+  postgres:
+    ports:
+      - "5432:5432"
