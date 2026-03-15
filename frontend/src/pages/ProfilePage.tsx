@@ -215,34 +215,52 @@ function ImageGrid({ images, onImageClick }: {
     onMouseLeave: (e: React.MouseEvent<HTMLImageElement>) => (e.currentTarget.style.opacity = '1'),
   }
 
+  const imgStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: 'center',
+    display: 'block',
+    cursor: 'pointer',
+    transition: 'opacity 0.15s',
+  }
+
+  const cellStyle: React.CSSProperties = {
+    overflow: 'hidden',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 0,
+  }
+
   if (count === 1) return (
-    <div style={{ borderRadius: '12px', overflow: 'hidden', height: '360px' }}>
-      <img src={getPostImageUrl(sorted[0].object_key)} alt=""
-        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block', cursor: 'pointer', transition: 'opacity 0.15s' }}
-        onClick={() => onImageClick(0)} {...hoverHandlers} />
-    </div>
+      <div style={{ borderRadius: '12px', overflow: 'hidden' }}>
+        <img src={getPostImageUrl(sorted[0].object_key)} alt=""
+          style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'cover', display: 'block', cursor: 'pointer', transition: 'opacity 0.15s' }}
+          onClick={() => onImageClick(0)} {...hoverHandlers} />
+      </div>
   )
 
   const cell = (src: string, idx: number, extra?: React.ReactNode): React.ReactElement => (
-    <div key={idx} style={{ position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+    <div key={idx} style={{ ...cellStyle, aspectRatio: '1/1', position: 'relative' }}>
       <img src={src} alt=""
-        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block', cursor: 'pointer', transition: 'opacity 0.15s' }}
+        style={imgStyle}
         onClick={() => onImageClick(idx)} {...hoverHandlers} />
       {extra}
     </div>
   )
 
   if (count === 2) return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden', height: '280px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden' }}>
       {sorted.map((img, i) => cell(getPostImageUrl(img.object_key), i))}
     </div>
   )
 
   if (count === 3) return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden', height: '320px' }}>
-      <div style={{ position: 'relative', overflow: 'hidden', gridRow: '1 / 3' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ ...cellStyle, aspectRatio: '1/1', gridRow: '1 / 3', position: 'relative' }}>
         <img src={getPostImageUrl(sorted[0].object_key)} alt=""
-          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block', cursor: 'pointer', transition: 'opacity 0.15s' }}
+          style={imgStyle}
           onClick={() => onImageClick(0)} {...hoverHandlers} />
       </div>
       {sorted.slice(1).map((img, i) => cell(getPostImageUrl(img.object_key), i + 1))}
@@ -252,7 +270,7 @@ function ImageGrid({ images, onImageClick }: {
   const shown = sorted.slice(0, 4)
   const extra = count - 4
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden', height: '400px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden' }}>
       {shown.map((img, i) => cell(
         getPostImageUrl(img.object_key),
         i,

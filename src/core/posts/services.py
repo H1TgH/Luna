@@ -23,7 +23,7 @@ class PostService:
         post_data: PostCreationDTO,
         author_id: UUID,
         images: list[UploadImageDTO] | None = None
-    ) -> None:
+    ) -> PostReadDTO:
         if not post_data.content and not images:
             raise EmptyPostException("Post must have content or at least one image")
 
@@ -42,21 +42,27 @@ class PostService:
                         image.data
                     )
                     file_name = str(uuid4()) + ".webp"
-                    content_type = "image/webp"
 
                     upload_tasks.append(
                         self.s3.upload(
                             object_name=file_name,
                             body=converted_image,
-                            content_type=content_type
+                            content_type="image/webp"
                         )
                     )
-
                     converted_images.append(PostImageDTO(object_key=file_name, order=index + 1))
 
                 await asyncio.gather(*upload_tasks)
 
-            await repository.add(author_id, post_data, converted_images)
+            result = await repository.add(author_id, post_data, converted_images)
+
+            if result.images:
+                result.images = [
+                    PostImageDTO(object_key=self.s3.get_file_url(img.object_key), order=img.order)
+                    for img in result.images
+                ]
+
+            return result
 
     async def get_post_by_id(self, post_id: UUID, current_user_id: UUID) -> PostReadDTO:
         async with self.uow() as session:

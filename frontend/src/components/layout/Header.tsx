@@ -347,7 +347,10 @@ export default function Header() {
                   </span>
                 )}
               </div>
-              <span style={{ fontSize: '13.5px', color: '#9095b8', fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>
+              <span style={{ 
+                fontSize: '13.5px', color: '#9095b8', fontFamily: "'Outfit', sans-serif", fontWeight: 400,
+                maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }}>
                 {me.username}
               </span>
             </Link>

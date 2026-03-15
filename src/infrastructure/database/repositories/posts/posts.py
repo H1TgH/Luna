@@ -16,24 +16,42 @@ class PostRepository:
     async def add(
         self,
         author_id: UUID,
-        post: PostCreationDTO,
+        post_data: PostCreationDTO,
         images: list[PostImageDTO] | None = None
-    ) -> None:
-        post_model = PostModel(
+    ) -> PostReadDTO:
+        post = PostModel(
             author_id=author_id,
-            content=post.content
+            content=post_data.content
         )
-        self.session.add(post_model)
+        self.session.add(post)
         await self.session.flush()
 
+        images_dto = []
         if images:
-            for image_dto in images:
+            for image in images:
                 image_model = PostImageModel(
-                    post_id=post_model.id,
-                    object_key=image_dto.object_key,
-                    order=image_dto.order
+                    post_id=post.id,
+                    object_key=image.object_key,
+                    order=image.order
                 )
                 self.session.add(image_model)
+                self.session.flush(image_model)
+                images_dto.append(
+                    PostImageDTO(
+                        object_key=image_model.object_key,
+                        order=image_model.order
+                    )
+                )
+
+        return PostReadDTO(
+            id=post.id,
+            author_id=author_id,
+            created_at=post.created_at,
+            likes_count=0,
+            is_current_user_likes=False,
+            content=post.content,
+            images=images_dto
+        )
 
     async def get_user_posts(
         self,

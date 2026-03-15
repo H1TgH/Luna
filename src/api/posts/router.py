@@ -19,7 +19,8 @@ posts_router = APIRouter(
 
 @posts_router.post(
     "/",
-    status_code=201
+    status_code=201,
+    response_model=PostReadSchema
 )
 @handle_post_exceptions
 async def create_post(
@@ -38,7 +39,7 @@ async def create_post(
                 content_type=image.content_type
             ))
 
-    await service.create(
+    return await service.create(
         post_data=post_dto,
         author_id=current_user.id,
         images=images_dto
