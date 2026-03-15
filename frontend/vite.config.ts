@@ -26,6 +26,10 @@ export default defineConfig({
         target: 'http://fastapi_app:8000',
         changeOrigin: true,
       },
+      '/media': {
+        target: 'http://minio:9000',
+        changeOrigin: true,
+      },
     },
   },
 })

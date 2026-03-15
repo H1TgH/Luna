@@ -19,6 +19,11 @@ class ProfileService:
         self.s3 = s3_storage
         self.image_processor = image_processor
 
+    def _build_avatar_url(self, avatar_key: str | None) -> str | None:
+        if not avatar_key:
+            return None
+        return self.s3.get_file_url(avatar_key)
+
     async def create(self, data: ProfileCreationDTO, user: CurrentUserDTO) -> None:
         async with self.uow() as session:
             repository = ProfileRepository(session)
@@ -48,7 +53,7 @@ class ProfileService:
                 last_name=profile.last_name,
                 birth_date=profile.birth_date,
                 gender=profile.gender,
-                avatar_url=profile.avatar_url,
+                avatar_url=self._build_avatar_url(profile.avatar_key),
                 status=profile.status
             )
 
@@ -69,7 +74,7 @@ class ProfileService:
                 last_name=profile.last_name,
                 birth_date=profile.birth_date,
                 gender=profile.gender,
-                avatar_url=profile.avatar_url,
+                avatar_url=self._build_avatar_url(profile.avatar_key),
                 status=profile.status
             )
 
@@ -112,8 +117,7 @@ class ProfileService:
 
             await self.s3.upload(object_key, converted, "image/webp")
 
-            avatar_url = f"{self.s3.public_endpoint}/{self.s3.bucket_name}/{object_key}"
-            await repository.update({"avatar_url": avatar_url}, user.id)
+            await repository.update({"avatar_key": object_key}, user.id)
 
     async def search(
         self,
@@ -137,7 +141,7 @@ class ProfileService:
                     last_name=p.last_name,
                     birth_date=p.birth_date,
                     gender=p.gender,
-                    avatar_url=p.avatar_url,
+                    avatar_url=self._build_avatar_url(p.avatar_key),
                     status=p.status
                 )
                 for p in profiles

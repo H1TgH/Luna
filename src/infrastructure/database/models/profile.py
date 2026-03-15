@@ -49,7 +49,7 @@ class ProfileModel(Base):
         nullable=True,
     )
 
-    avatar_url: Mapped[str] = mapped_column(
+    avatar_key: Mapped[str] = mapped_column(
         String,
         nullable=True,
     )
