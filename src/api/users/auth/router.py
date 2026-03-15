@@ -53,7 +53,7 @@ async def login_user(
     )
     refresh_token = service.create_token(
         {"sub": str(user.id), "type": "refresh"},
-        expires_delta=timedelta(minutes=settings.security.refresh_ttl),
+        expires_delta=timedelta(days=settings.security.refresh_ttl),
     )
 
     return {
