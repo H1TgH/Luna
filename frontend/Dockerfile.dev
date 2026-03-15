@@ -1,0 +1,13 @@
+FROM node:20-alpine
+
+RUN npm install -g pnpm
+
+WORKDIR /app
+
+COPY package.json ./
+
+RUN pnpm install
+
+EXPOSE 3000
+
+CMD ["pnpm", "dev"]

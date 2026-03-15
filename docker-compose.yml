@@ -66,7 +66,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-  
+
   minio-init:
     image: minio/mc
     env_file:
@@ -82,16 +82,9 @@ services:
     container_name: luna_frontend
     build:
       context: ./frontend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - fastapi_app
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-    
+
   nginx:
     image: nginx:1.27-alpine
     container_name: nginx
