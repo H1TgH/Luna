@@ -463,9 +463,11 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
   const MAX_IMAGES = 10
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value)
-    e.target.style.height = 'auto'
-    e.target.style.height = e.target.scrollHeight + 'px'
+      setContent(e.target.value)
+      const scrollY = window.scrollY
+      e.target.style.height = 'auto'
+      e.target.style.height = e.target.scrollHeight + 'px'
+      window.scrollTo({ top: scrollY })
   }
 
   const handleFiles = (files: FileList | File[] | null) => {

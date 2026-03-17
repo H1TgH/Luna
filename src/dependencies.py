@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 
 from core.users.auth.entities import CurrentUserDTO
-from core.users.auth.exceptions import InvalidTokenException, UserDoesNotExistException
+from core.users.auth.exceptions import InvalidTokenException, UserDoesNotExistException, EmailNotConfirmedException
 from core.users.auth.services import AuthService, get_auth_service
 
 
@@ -20,5 +20,10 @@ async def get_current_user(
     except UserDoesNotExistException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        ) from e
+    except EmailNotConfirmedException as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         ) from e

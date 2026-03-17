@@ -11,10 +11,12 @@ from core.users.auth.exceptions import (
     InvalidTokenException,
     UserAlreadyExistsException,
     UserDoesNotExistException,
+    EmailNotConfirmedException
 )
 from infrastructure.database.repositories.users.auth import AuthRepository
 from infrastructure.database.uow import UnitOfWork
 from settings import settings
+from core.users.auth.tasks import send_confirmation_email
 
 
 class AuthService:
@@ -34,7 +36,15 @@ class AuthService:
             )
             user.password = hashed_password.decode("utf-8")
 
-            await repository.add(user)
+            user = await repository.add(user)
+
+            confirmation_token = self.create_token(
+                data={"sub": str(user.id), "type": "email_confirm"},
+                expires_delta=timedelta(minutes=15)
+            )
+            confirmation_url = f"{settings.app.base_url}/confirm-email?token={confirmation_token}"
+
+            send_confirmation_email.delay(user.email, confirmation_url)
 
     async def authenticate(self, creds: UserLoginDTO) -> AuthenticatedUserDTO:
         async with self.uow() as session:
@@ -59,12 +69,25 @@ class AuthService:
             if not user:
                 raise UserDoesNotExistException("User does not exist")
 
+            if not user.is_email_confirmed:
+                raise EmailNotConfirmedException("Email not confirmed")
+
             dto = CurrentUserDTO(
                 id=user.id,
                 email=user.email,
             )
 
         return dto
+
+    async def confirm_email(self, user_id) -> None:
+        async with self.uow() as session:
+            repository = AuthRepository(session)
+
+            user = await repository.get_by_id(user_id)
+            if not user:
+                raise UserDoesNotExistException("User does not exist")
+
+            await repository.confirm_email(user_id)
 
     @staticmethod
     async def verify_password(plain_password: str, hashed_password: str) -> bool:

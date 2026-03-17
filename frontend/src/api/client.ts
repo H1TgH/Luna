@@ -62,6 +62,11 @@ api.interceptors.response.use(
       }
     }
 
+    if (error.response?.status === 403 && !isAuthRoute) {
+      window.location.href = '/confirm-email-pending'
+      return Promise.reject(error)
+    }
+
     return Promise.reject(error)
   }
 )

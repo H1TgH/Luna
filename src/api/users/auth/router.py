@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 
 from api.users.auth.decorators import handle_auth_exceptions
 from api.users.auth.schemas import TokenSchema, TokensSchema, UserLoginSchema, UserRegistrationSchema
@@ -31,6 +31,20 @@ async def register_user(
     return {
         "msg": "User created successfully"
     }
+
+
+@auth_router.post(
+    "/confirm-email",
+    status_code=status.HTTP_200_OK
+)
+@handle_auth_exceptions
+async def confirm_email(
+    token: str = Query(...),
+    service: AuthService = Depends(get_auth_service)
+):
+    token = service.verify_token(token, "email_confirm")
+
+    await service.confirm_email(token["sub"])
 
 
 @auth_router.post(

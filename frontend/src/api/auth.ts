@@ -10,4 +10,7 @@ export const authApi = {
 
   refresh: (token: string) =>
     api.post<{ token: string }>('/api/v1/users/auth/refresh', { token }),
+
+  confirmEmail: (token: string) =>
+    api.post(`/api/v1/users/auth/confirm-email?token=${token}`),
 }
