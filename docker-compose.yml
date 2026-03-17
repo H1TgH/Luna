@@ -3,7 +3,7 @@ services:
     container_name: fastapi_app
     build:
       context: .
-    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" ]
+    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers 4" ]
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -98,6 +98,35 @@ services:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     restart: always
+
+  redis:
+    image: redis:8.6.1-alpine
+    container_name: redis
+    depends_on:
+      - fastapi_app
+
+  redis_ui:
+    image: redis/redisinsight:3.2.0
+    container_name: redis_ui
+    depends_on:
+      - redis
+    ports:
+      - "5540:5540"
+  
+  celery:
+    build:
+      context: .
+    container_name: celery
+    command: celery -A infrastructure.celery_app.worker.celery worker --loglevel=info
+    volumes:
+      - ./src:/app
+    env_file:
+      - ".env"
+    environment:
+      PYTHONPATH: /app
+    depends_on:
+      - fastapi_app
+      - redis
 
 volumes:
   postgres_data:
