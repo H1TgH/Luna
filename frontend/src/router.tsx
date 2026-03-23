@@ -7,6 +7,8 @@ import RootRedirect from './pages/Rootredirect'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import ConfirmEmailPage from './pages/ConfirmEmailPage'
 import ConfirmEmailPendingPage from './pages/ConfirmEmailPendingPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 export const router = createBrowserRouter([
   {
@@ -43,4 +45,13 @@ export const router = createBrowserRouter([
     path: '/confirm-email-pending',
     element: <ConfirmEmailPendingPage />,
   },
+  {
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />
+  },
+  
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />
+  }
 ])

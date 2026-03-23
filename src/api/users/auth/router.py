@@ -1,9 +1,9 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from api.users.auth.decorators import handle_auth_exceptions
-from api.users.auth.schemas import TokenSchema, TokensSchema, UserLoginSchema, UserRegistrationSchema
+from api.users.auth.schemas import TokenSchema, TokensSchema, UserLoginSchema, UserRegistrationSchema, PasswordResetSchema, RequestPasswordResetSchema
 from core.users.auth.entities import UserCreationDTO, UserLoginDTO
 from core.users.auth.services import AuthService, get_auth_service
 from settings import settings
@@ -96,3 +96,30 @@ async def refresh_user(
     return {
         "token": access_token
     }
+
+
+@auth_router.post(
+    "/reset-password/request",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+@handle_auth_exceptions
+async def request_password_reset(
+    email: RequestPasswordResetSchema,
+    service: AuthService = Depends(get_auth_service)
+):
+    await service.request_password_reset(email.email)
+
+
+@auth_router.post(
+    "/reset-password",
+    status_code=status.HTTP_200_OK
+)
+@handle_auth_exceptions
+async def reset_password(
+    new_password: PasswordResetSchema,
+    token: str = Query(...),
+    service: AuthService = Depends(get_auth_service)
+):
+    token = service.verify_token(token, "password_reset")
+
+    await service.change_password(token["sub"], new_password.new_Password)

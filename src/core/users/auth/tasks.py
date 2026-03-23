@@ -1,6 +1,6 @@
 from infrastructure.celery_app.worker import celery
-from infrastructure.email.sender import EmailSender
 from infrastructure.email.renderer import EmailRenderer
+from infrastructure.email.sender import EmailSender
 from settings import settings
 
 
@@ -15,8 +15,16 @@ renderer = EmailRenderer()
 
 
 @celery.task
-def send_confirmation_email(to: str, confirmation_url: str):
+def send_confirmation_email(to: str, confirmation_url: str) -> None:
     context = {"confirmation_url": confirmation_url}
     text, html = renderer.render("email-confirm.html", context)
 
     sender.send(to, "Подтверждение почты", text, html)
+
+
+@celery.task
+def send_reset_password_email(to, reset_url: str) -> None:
+    context = {"reset_url": reset_url}
+    text, html = renderer.render("password-reset.html", context)
+
+    sender.send(to, "Смена пароля", text, html)

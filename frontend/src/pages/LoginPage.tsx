@@ -195,13 +195,18 @@ export default function LoginPage() {
                 onBlur={() => touch('password')}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <span style={{
-                  fontSize: '12.5px', color: 'rgba(139,127,232,0.55)',
-                  fontFamily: "'Outfit', sans-serif", cursor: 'default',
-                  letterSpacing: '0.01em',
-                }}>
+                <Link
+                  to="/forgot-password"
+                  style={{
+                    fontSize: '12.5px', color: 'rgba(139,127,232,0.55)',
+                    fontFamily: "'Outfit', sans-serif",
+                    letterSpacing: '0.01em', textDecoration: 'none',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#a99ef0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(139,127,232,0.55)')}
+                >
                   Забыли пароль?
-                </span>
+                </Link>
               </div>
             </div>
 

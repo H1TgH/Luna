@@ -13,4 +13,10 @@ export const authApi = {
 
   confirmEmail: (token: string) =>
     api.post(`/api/v1/users/auth/confirm-email?token=${token}`),
+
+  requestPasswordReset: (email: string) =>
+    api.post('/api/v1/users/auth/reset-password/request', { email }),
+
+  resetPassword: (token: string, new_password: string) =>
+    api.post(`/api/v1/users/auth/reset-password?token=${token}`, { new_Password: new_password }),
 }

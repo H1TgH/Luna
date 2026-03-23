@@ -1,22 +1,23 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 import bcrypt
 from jose import ExpiredSignatureError, JWTError, jwt
 
 from core.users.auth.entities import AuthenticatedUserDTO, CurrentUserDTO, UserCreationDTO, UserLoginDTO
 from core.users.auth.exceptions import (
+    EmailNotConfirmedException,
     InvalidCredentialsException,
     InvalidTokenException,
     UserAlreadyExistsException,
     UserDoesNotExistException,
-    EmailNotConfirmedException
 )
+from core.users.auth.tasks import send_confirmation_email, send_reset_password_email
 from infrastructure.database.repositories.users.auth import AuthRepository
 from infrastructure.database.uow import UnitOfWork
 from settings import settings
-from core.users.auth.tasks import send_confirmation_email
 
 
 class AuthService:
@@ -31,9 +32,7 @@ class AuthService:
             if existing_user:
                 raise UserAlreadyExistsException("User already exists")
 
-            hashed_password = await asyncio.to_thread(
-                bcrypt.hashpw, user.password.encode("utf-8"), bcrypt.gensalt()
-            )
+            hashed_password = self.hash_password(user.password)
             user.password = hashed_password.decode("utf-8")
 
             user = await repository.add(user)
@@ -79,7 +78,7 @@ class AuthService:
 
         return dto
 
-    async def confirm_email(self, user_id) -> None:
+    async def confirm_email(self, user_id: UUID) -> None:
         async with self.uow() as session:
             repository = AuthRepository(session)
 
@@ -88,6 +87,43 @@ class AuthService:
                 raise UserDoesNotExistException("User does not exist")
 
             await repository.confirm_email(user_id)
+
+    async def request_password_reset(self, email: str):
+        async with self.uow() as session:
+            repository = AuthRepository(session)
+
+            user = await repository.get_by_email(email)
+            if user is None:
+                raise UserDoesNotExistException("User does not exist")
+
+            reset_token = self.create_token(
+                data={"sub": str(user.id), "type": "password_reset"},
+                expires_delta=timedelta(minutes=15)
+            )
+            reset_url = f"{settings.app.base_url}/reset-password?token={reset_token}"
+
+            send_reset_password_email.delay(email, reset_url)
+
+    async def change_password(self, user_id: UUID, new_password: str) -> None:
+        async with self.uow() as session:
+            repository = AuthRepository(session)
+
+            user = await repository.get_by_id(user_id)
+            if user is None:
+                raise UserDoesNotExistException("User does not exist")
+            
+            hash = await self.hash_password(new_password)
+
+            await repository.reset_password(user_id, hash)
+
+    @staticmethod
+    async def hash_password(password: str) -> str:
+        hashed = await asyncio.to_thread(
+            bcrypt.hashpw,
+            password.encode("utf-8"),
+            bcrypt.gensalt()
+        )
+        return hashed.decode("utf-8")
 
     @staticmethod
     async def verify_password(plain_password: str, hashed_password: str) -> bool:

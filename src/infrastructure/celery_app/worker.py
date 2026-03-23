@@ -3,7 +3,6 @@ from celery import Celery
 from settings import settings
 
 
-
 celery = Celery(
     "worker",
     broker=settings.redis.celery_url,

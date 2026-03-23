@@ -19,3 +19,11 @@ class TokensSchema(BaseModel):
 
 class TokenSchema(BaseModel):
     token: str
+
+
+class RequestPasswordResetSchema(BaseModel):
+    email: str
+
+
+class PasswordResetSchema(BaseModel):
+    new_Password: str

@@ -34,6 +34,10 @@ class AuthRepository:
 
         return result.scalar_one_or_none()
 
-    async def confirm_email(self, user_id) -> None:
+    async def confirm_email(self, user_id: UUID) -> None:
         stmt = update(UserModel).where(UserModel.id == user_id).values(is_email_confirmed=True)
+        await self.session.execute(stmt)
+
+    async def reset_password(self, user_id: UUID, new_password_hash: UUID) -> None:
+        stmt = update(UserModel).where(UserModel.id == user_id).values(password=new_password_hash)
         await self.session.execute(stmt)
