@@ -113,8 +113,20 @@ export default function LoginPage() {
     try {
       const { data: tokens } = await authApi.login({ email, password })
       setTokens(tokens.access_token, tokens.refresh_token)
-      const { data: profile } = await profileApi.getMe()
-      navigate(`/${profile.username}`)
+
+      try {
+        const { data: profile } = await profileApi.getMe()
+        navigate(`/${profile.username}`)
+      } catch (profileErr: unknown) {
+        const axiosErr = profileErr as { response?: { status?: number } }
+        if (axiosErr?.response?.status === 404) {
+          // Profile doesn't exist yet — redirect to setup
+          navigate('/setup-profile')
+        } else {
+          // Unexpected error, still go to root and let RootRedirect handle it
+          navigate('/')
+        }
+      }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: unknown } } }
       const detail = axiosErr?.response?.data?.detail

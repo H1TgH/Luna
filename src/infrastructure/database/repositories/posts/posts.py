@@ -35,7 +35,7 @@ class PostRepository:
                     order=image.order
                 )
                 self.session.add(image_model)
-                self.session.flush(image_model)
+                await self.session.flush()
                 images_dto.append(
                     PostImageDTO(
                         object_key=image_model.object_key,

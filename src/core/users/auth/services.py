@@ -32,8 +32,8 @@ class AuthService:
             if existing_user:
                 raise UserAlreadyExistsException("User already exists")
 
-            hashed_password = self.hash_password(user.password)
-            user.password = hashed_password.decode("utf-8")
+            hashed_password = await self.hash_password(user.password)
+            user.password = hashed_password
 
             user = await repository.add(user)
 
@@ -111,7 +111,7 @@ class AuthService:
             user = await repository.get_by_id(user_id)
             if user is None:
                 raise UserDoesNotExistException("User does not exist")
-            
+
             hash = await self.hash_password(new_password)
 
             await repository.reset_password(user_id, hash)

@@ -176,11 +176,13 @@ def profile_payload() -> Callable:
 def user_factory(db_session: AsyncSession) -> Callable:
     async def _create_user(
         email: str = "test@example.com",
-        password: str = "123123123"
+        password: str = "123123123",
+        is_email_confirmed: bool = True
     ) -> UserModel:
         user = UserModel(
             email=email,
             password=bcrypt.hashpw(password.encode(), bcrypt.gensalt(4)).decode(),
+            is_email_confirmed=is_email_confirmed
         )
 
         db_session.add(user)

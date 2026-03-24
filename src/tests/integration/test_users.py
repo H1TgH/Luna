@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
@@ -12,7 +13,9 @@ from infrastructure.database.models.users import UserModel
 async def test_user_register(client: AsyncClient, db_session: AsyncSession, user_auth_payload):
     payload = user_auth_payload()
 
-    response = await client.post("/api/v1/users/auth/register", json=payload)
+    with patch("core.users.auth.services.send_confirmation_email.delay") as mock_send:
+        response = await client.post("/api/v1/users/auth/register", json=payload)
+        mock_send.assert_called_once()
 
     assert response.status_code == HTTPStatus.CREATED
 

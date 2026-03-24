@@ -12,7 +12,7 @@ export default function RootRedirect() {
   useEffect(() => {
     if (!fetched) return
     if (me?.username) navigate(`/${me.username}`, { replace: true })
-    else navigate('/login', { replace: true })
+    else navigate('/setup-profile', { replace: true })
   }, [fetched, me, navigate])
 
   return (

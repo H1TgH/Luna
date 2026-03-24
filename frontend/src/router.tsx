@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import ProfilePage from './pages/ProfilePage'
 import SearchPage from './pages/SearchPage'
 import RootRedirect from './pages/Rootredirect'
+import SetupProfilePage from './pages/SetupProfilePage'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import ConfirmEmailPage from './pages/ConfirmEmailPage'
 import ConfirmEmailPendingPage from './pages/ConfirmEmailPendingPage'
@@ -18,6 +19,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <RootRedirect />,
+      },
+      {
+        path: 'setup-profile',
+        element: <SetupProfilePage />,
       },
       {
         path: 'search',
@@ -49,7 +54,6 @@ export const router = createBrowserRouter([
     path: '/forgot-password',
     element: <ForgotPasswordPage />
   },
-  
   {
     path: '/reset-password',
     element: <ResetPasswordPage />
