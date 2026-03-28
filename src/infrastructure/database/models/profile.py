@@ -5,7 +5,7 @@ from sqlalchemy import Date as PGDate, Enum as PGEnum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.users.profile.enums import GenderEnum
+from core.profile.enums import GenderEnum
 from infrastructure.database.database import Base
 
 

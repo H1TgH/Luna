@@ -1,9 +1,9 @@
 from uuid import UUID
 
+from core.auth.entities import UserCreationDTO
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.users.auth.entities import UserCreationDTO
 from infrastructure.database.models.users import UserModel
 
 

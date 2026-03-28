@@ -7,7 +7,7 @@ from api.posts.decorators import handle_post_exceptions
 from api.posts.schemas import ImageSchema, PostPageSchema, PostReadSchema
 from core.posts.entities import PostCreationDTO, UploadImageDTO
 from core.posts.services import PostService, get_post_service
-from core.users.auth.entities import CurrentUserDTO
+from core.auth.entities import CurrentUserDTO
 from dependencies import get_current_user
 
 

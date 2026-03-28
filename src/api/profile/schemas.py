@@ -1,9 +1,8 @@
 from datetime import date
 from uuid import UUID
 
+from core.profile.enums import GenderEnum
 from pydantic import BaseModel
-
-from core.users.profile.enums import GenderEnum
 
 
 class ProfileCreationSchema(BaseModel):

@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from core.exceptions import PermissionDeniedException
 from core.posts.entities import ImageDTO, PostCreationDTO, PostImageDTO, PostReadDTO, PostsPageDTO, UploadImageDTO
 from core.posts.exceptions import EmptyPostException, PostDoesNotExistException, UnacceptableImageCountException
-from infrastructure.database.repositories.posts.posts import PostRepository
+from infrastructure.database.repositories.posts import PostRepository
 from infrastructure.database.uow import UnitOfWork
 from infrastructure.media.images.processor import ImageProcessor
 from infrastructure.s3.storage import S3Storage

@@ -1,10 +1,10 @@
 from typing import Any
 from uuid import UUID
 
+from core.profile.entities import ProfileCreationDTO
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.users.profile.entities import ProfileCreationDTO
 from infrastructure.database.models.profile import ProfileModel
 
 

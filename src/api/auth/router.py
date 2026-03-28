@@ -1,9 +1,7 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, Query, status
-
-from api.users.auth.decorators import handle_auth_exceptions
-from api.users.auth.schemas import (
+from api.auth.decorators import handle_auth_exceptions
+from api.auth.schemas import (
     PasswordResetSchema,
     RequestPasswordResetSchema,
     TokenSchema,
@@ -11,8 +9,10 @@ from api.users.auth.schemas import (
     UserLoginSchema,
     UserRegistrationSchema,
 )
-from core.users.auth.entities import UserCreationDTO, UserLoginDTO
-from core.users.auth.services import AuthService, get_auth_service
+from core.auth.entities import UserCreationDTO, UserLoginDTO
+from core.auth.services import AuthService, get_auth_service
+from fastapi import APIRouter, Depends, Query, status
+
 from settings import settings
 
 

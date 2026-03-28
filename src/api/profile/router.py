@@ -1,12 +1,12 @@
 from dataclasses import asdict
 
+from api.profile.decorators import handle_profile_exceptions
+from api.profile.schemas import ProfileCreationSchema, ProfileSchema, ProfileUpdateSchema
+from core.auth.entities import CurrentUserDTO
+from core.profile.entities import ProfileCreationDTO, ProfileUpdateDTO
+from core.profile.services import ProfileService, get_profile_service
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
-from api.users.profile.decorators import handle_profile_exceptions
-from api.users.profile.schemas import ProfileCreationSchema, ProfileSchema, ProfileUpdateSchema
-from core.users.auth.entities import CurrentUserDTO
-from core.users.profile.entities import ProfileCreationDTO, ProfileUpdateDTO
-from core.users.profile.services import ProfileService, get_profile_service
 from dependencies import get_current_user
 
 

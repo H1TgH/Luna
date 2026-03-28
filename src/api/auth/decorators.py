@@ -2,7 +2,7 @@ from functools import wraps
 
 from fastapi import HTTPException, status
 
-from core.users.auth.exceptions import (
+from core.auth.exceptions import (
     InvalidCredentialsException,
     InvalidTokenException,
     UserAlreadyExistsException,

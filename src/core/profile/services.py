@@ -3,14 +3,15 @@ from dataclasses import asdict
 from typing import BinaryIO
 from uuid import UUID
 
-from core.users.auth.entities import CurrentUserDTO
-from core.users.profile.entities import ProfileCreationDTO, ProfileReadDTO, ProfileUpdateDTO
-from core.users.profile.exceptions import ProfileAlreadyExistsException, ProfileDoesNotExistException
-from infrastructure.database.repositories.users.profile import ProfileRepository
+from core.auth.entities import CurrentUserDTO
+from core.profile.entities import ProfileCreationDTO, ProfileReadDTO, ProfileUpdateDTO
+from core.profile.exceptions import ProfileAlreadyExistsException, ProfileDoesNotExistException
+
 from infrastructure.database.uow import UnitOfWork
 from infrastructure.media.images.processor import ImageProcessor
 from infrastructure.s3.storage import S3Storage
 from settings import settings
+from infrastructure.database.repositories.profile import ProfileRepository
 
 
 class ProfileService:

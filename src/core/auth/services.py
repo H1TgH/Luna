@@ -4,18 +4,18 @@ from typing import Any
 from uuid import UUID
 
 import bcrypt
-from jose import ExpiredSignatureError, JWTError, jwt
-
-from core.users.auth.entities import AuthenticatedUserDTO, CurrentUserDTO, UserCreationDTO, UserLoginDTO
-from core.users.auth.exceptions import (
+from core.auth.entities import AuthenticatedUserDTO, CurrentUserDTO, UserCreationDTO, UserLoginDTO
+from core.auth.exceptions import (
     EmailNotConfirmedException,
     InvalidCredentialsException,
     InvalidTokenException,
     UserAlreadyExistsException,
     UserDoesNotExistException,
 )
-from core.users.auth.tasks import send_confirmation_email, send_reset_password_email
-from infrastructure.database.repositories.users.auth import AuthRepository
+from core.auth.tasks import send_confirmation_email, send_reset_password_email
+from infrastructure.database.repositories.auth import AuthRepository
+from jose import ExpiredSignatureError, JWTError, jwt
+
 from infrastructure.database.uow import UnitOfWork
 from settings import settings
 
