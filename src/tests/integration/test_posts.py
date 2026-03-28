@@ -1,24 +1,14 @@
 import http
-import io
 from collections.abc import Callable
+from http import HTTPStatus
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient, Response
-from PIL import Image
 
 from infrastructure.database.models.posts import PostModel
 from infrastructure.database.models.profile import ProfileModel
 from infrastructure.database.models.users import UserModel
-
-
-@pytest.fixture
-def fake_image_bytes() -> bytes:
-    img = Image.new("RGB", (10, 10), color="blue")
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG")
-    buf.seek(0)
-    return buf.getvalue()
 
 
 @pytest.mark.asyncio
@@ -563,3 +553,208 @@ async def test_is_current_user_likes_false_after_remove(
     post_data = response.json()["posts"][0]
     assert post_data["likes_count"] == 0
     assert post_data["is_current_user_likes"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_empty(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+):
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_after_post_with_image(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+    fake_image_bytes: bytes,
+):
+    await client.post(
+        "/api/v1/posts/",
+        files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
+        headers=auth_header,
+    )
+
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_text_only_post_not_included(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+):
+    await client.post(
+        "/api/v1/posts/",
+        data={"content": "no images here"},
+        headers=auth_header,
+    )
+
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_multiple_images_in_one_post(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+    fake_image_bytes: bytes,
+):
+    images = [
+        ("images", (f"photo{i}.jpg", fake_image_bytes, "image/jpeg"))
+        for i in range(3)
+    ]
+    await client.post("/api/v1/posts/", files=images, headers=auth_header)
+
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()) == 3
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_multiple_posts(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+    fake_image_bytes: bytes,
+):
+    for _ in range(2):
+        await client.post(
+            "/api/v1/posts/",
+            files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
+            headers=auth_header,
+        )
+
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_does_not_return_other_users_images(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+    user_factory: Callable[..., UserModel],
+    profile_factory: Callable[..., ProfileModel],
+    auth_header_factory: Callable[[UserModel], dict[str, str]],
+    fake_image_bytes: bytes,
+):
+    other_user: UserModel = await user_factory(email="other@example.com")
+    await profile_factory(user_id=other_user.id, username="otheruser")
+    other_header: dict[str, str] = auth_header_factory(other_user)
+
+    await client.post(
+        "/api/v1/posts/",
+        files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
+        headers=other_header,
+    )
+
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_response_schema(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+    fake_image_bytes: bytes,
+):
+    await client.post(
+        "/api/v1/posts/",
+        files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
+        headers=auth_header,
+    )
+
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    item = response.json()[0]
+    assert "post_id" in item
+    assert "object_key" in item
+    assert "created_at" in item
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_pagination_limit(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+    fake_image_bytes: bytes,
+):
+    for _ in range(5):
+        await client.post(
+            "/api/v1/posts/",
+            files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
+            headers=auth_header,
+        )
+
+    response = await client.get(
+        f"/api/v1/posts/images/{test_profile.id}",
+        params={"limit": 2},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_unauthorized(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+):
+    response = await client.get(f"/api/v1/posts/images/{test_profile.id}")
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_get_user_images_nonexistent_profile(
+    client: AsyncClient,
+    auth_header: dict[str, str],
+):
+    response = await client.get(
+        f"/api/v1/posts/images/{uuid4()}",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == []

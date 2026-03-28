@@ -2,7 +2,12 @@ from functools import wraps
 
 from fastapi import HTTPException, status
 
-from core.users.auth.exceptions import InvalidCredentialsException, InvalidTokenException, UserAlreadyExistsException
+from core.users.auth.exceptions import (
+    InvalidCredentialsException,
+    InvalidTokenException,
+    UserAlreadyExistsException,
+    UserDoesNotExistException,
+)
 
 
 def handle_auth_exceptions(func):
@@ -18,6 +23,11 @@ def handle_auth_exceptions(func):
         except (InvalidCredentialsException, InvalidTokenException) as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(e)
+            ) from e
+        except UserDoesNotExistException as e:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(e)
             ) from e
 

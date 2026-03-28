@@ -3,7 +3,14 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, Query, status
 
 from api.users.auth.decorators import handle_auth_exceptions
-from api.users.auth.schemas import TokenSchema, TokensSchema, UserLoginSchema, UserRegistrationSchema, PasswordResetSchema, RequestPasswordResetSchema
+from api.users.auth.schemas import (
+    PasswordResetSchema,
+    RequestPasswordResetSchema,
+    TokenSchema,
+    TokensSchema,
+    UserLoginSchema,
+    UserRegistrationSchema,
+)
 from core.users.auth.entities import UserCreationDTO, UserLoginDTO
 from core.users.auth.services import AuthService, get_auth_service
 from settings import settings
@@ -122,4 +129,4 @@ async def reset_password(
 ):
     token = service.verify_token(token, "password_reset")
 
-    await service.change_password(token["sub"], new_password.new_Password)
+    await service.change_password(token["sub"], new_password.new_password)

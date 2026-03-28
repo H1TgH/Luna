@@ -26,4 +26,4 @@ class RequestPasswordResetSchema(BaseModel):
 
 
 class PasswordResetSchema(BaseModel):
-    new_Password: str
+    new_password: str

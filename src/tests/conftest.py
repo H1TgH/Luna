@@ -1,6 +1,6 @@
 import asyncio
 import io
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from uuid import UUID
@@ -24,17 +24,17 @@ from settings import settings
 
 
 class TestUnitOfWork:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     @asynccontextmanager
-    async def __call__(self):
+    async def __call__(self) -> AsyncGenerator[AsyncSession]:
         yield self._session
         await self._session.commit()
 
 
 @pytest.fixture
-async def db_session():
+async def db_session() -> AsyncGenerator[AsyncSession]:
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from infrastructure.database.database import Base
@@ -83,7 +83,7 @@ def s3_avatars() -> S3Storage:
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def create_test_buckets(s3_posts: S3Storage, s3_avatars: S3Storage):
+async def create_test_buckets(s3_posts: S3Storage, s3_avatars: S3Storage) -> AsyncGenerator[None]:
     for s3 in (s3_posts, s3_avatars):
         async with s3.get_internal_client() as client:
             try:
@@ -105,25 +105,29 @@ async def create_test_buckets(s3_posts: S3Storage, s3_avatars: S3Storage):
 
 
 @pytest.fixture
-def test_auth_service(db_session: AsyncSession):
+def test_auth_service(db_session: AsyncSession) -> AuthService:
     uow = TestUnitOfWork(db_session)
     return AuthService(uow)
 
 
 @pytest.fixture
-def test_profile_service(db_session: AsyncSession, s3_avatars: S3Storage):
+def test_profile_service(db_session: AsyncSession, s3_avatars: S3Storage) -> ProfileService:
     uow = TestUnitOfWork(db_session)
     return ProfileService(uow=uow, s3_storage=s3_avatars, image_processor=ImageProcessor())
 
 
 @pytest.fixture
-def test_post_service(db_session: AsyncSession, s3_posts: S3Storage):
+def test_post_service(db_session: AsyncSession, s3_posts: S3Storage) -> PostService:
     uow = TestUnitOfWork(db_session)
     return PostService(uow=uow, s3_storage=s3_posts, image_processor=ImageProcessor())
 
 
 @pytest.fixture
-async def client(test_auth_service, test_profile_service, test_post_service):
+async def client(
+    test_auth_service: AuthService,
+    test_profile_service: ProfileService,
+    test_post_service: PostService,
+) -> AsyncGenerator[AsyncClient]:
     app.dependency_overrides[get_auth_service] = lambda: test_auth_service
     app.dependency_overrides[get_profile_service] = lambda: test_profile_service
     app.dependency_overrides[get_post_service] = lambda: test_post_service
@@ -135,7 +139,7 @@ async def client(test_auth_service, test_profile_service, test_post_service):
 
 
 @pytest.fixture
-def fake_image_bytes():
+def fake_image_bytes() -> bytes:
     img = Image.new("RGB", (10, 10), color="blue")
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
@@ -144,9 +148,9 @@ def fake_image_bytes():
 
 
 @pytest.fixture
-def user_auth_payload() -> Callable:
-    def _payload(**overrides):
-        data = {
+def user_auth_payload() -> Callable[..., dict[str, str]]:
+    def _payload(**overrides: str) -> dict[str, str]:
+        data: dict[str, str] = {
             "email": "test@example.com",
             "password": "123123123",
         }
@@ -157,9 +161,9 @@ def user_auth_payload() -> Callable:
 
 
 @pytest.fixture
-def profile_payload() -> Callable:
-    def _payload(**overrides):
-        data = {
+def profile_payload() -> Callable[..., dict[str, str]]:
+    def _payload(**overrides: str) -> dict[str, str]:
+        data: dict[str, str] = {
             "username": "test",
             "first_name": "test",
             "last_name": "test",
@@ -173,7 +177,7 @@ def profile_payload() -> Callable:
 
 
 @pytest.fixture
-def user_factory(db_session: AsyncSession) -> Callable:
+def user_factory(db_session: AsyncSession) -> Callable[..., UserModel]:
     async def _create_user(
         email: str = "test@example.com",
         password: str = "123123123",
@@ -195,7 +199,7 @@ def user_factory(db_session: AsyncSession) -> Callable:
 
 
 @pytest.fixture
-def profile_factory(db_session: AsyncSession) -> Callable:
+def profile_factory(db_session: AsyncSession) -> Callable[..., ProfileModel]:
     async def _create_profile(
         user_id: UUID,
         username: str = "test",
@@ -223,7 +227,7 @@ def profile_factory(db_session: AsyncSession) -> Callable:
 
 
 @pytest.fixture
-def post_factory(db_session: AsyncSession) -> Callable:
+def post_factory(db_session: AsyncSession) -> Callable[..., PostModel]:
     async def _create_post(
         author_id: UUID,
         content: str | None = "Hello, World!"
@@ -243,7 +247,7 @@ def post_factory(db_session: AsyncSession) -> Callable:
 
 
 @pytest.fixture
-def auth_header_factory(test_auth_service: AuthService) -> Callable:
+def auth_header_factory(test_auth_service: AuthService) -> Callable[[UserModel], dict[str, str]]:
     def _create_auth_header(user: UserModel) -> dict[str, str]:
         token = test_auth_service.create_token(
             {"sub": str(user.id), "type": "access"},
@@ -256,15 +260,15 @@ def auth_header_factory(test_auth_service: AuthService) -> Callable:
 
 
 @pytest.fixture
-async def test_user(db_session: AsyncSession, user_factory: Callable) -> UserModel:
+async def test_user(user_factory: Callable[..., UserModel]) -> UserModel:
     return await user_factory()
 
 
 @pytest.fixture
-async def test_profile(test_user: UserModel, db_session: AsyncSession, profile_factory: Callable) -> ProfileModel:
+async def test_profile(test_user: UserModel, profile_factory: Callable[..., ProfileModel]) -> ProfileModel:
     return await profile_factory(test_user.id)
 
 
 @pytest.fixture
-def auth_header(test_user: UserModel, auth_header_factory) -> dict[str, str]:
+def auth_header(test_user: UserModel, auth_header_factory: Callable[[UserModel], dict[str, str]]) -> dict[str, str]:
     return auth_header_factory(test_user)

@@ -1,6 +1,11 @@
+from collections.abc import Callable
 from http import HTTPStatus
 
 import pytest
+from httpx import AsyncClient
+
+from infrastructure.database.models.profile import ProfileModel
+from infrastructure.database.models.users import UserModel
 
 
 @pytest.mark.asyncio
@@ -206,3 +211,224 @@ async def test_upload_avatar_unauthorized(client, test_profile, fake_image_bytes
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_by_username(
+    client: AsyncClient,
+    user_factory: Callable[..., UserModel],
+    profile_factory: Callable[..., ProfileModel],
+    auth_header: dict[str, str],
+):
+    user: UserModel = await user_factory(email="alice@example.com")
+    await profile_factory(user_id=user.id, username="alicewonder", first_name="Alice", last_name="Wonder")
+
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "alicewonder"},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    usernames = [p["username"] for p in response.json()]
+    assert "alicewonder" in usernames
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_by_first_name(
+    client: AsyncClient,
+    user_factory: Callable[..., UserModel],
+    profile_factory: Callable[..., ProfileModel],
+    auth_header: dict[str, str],
+):
+    user: UserModel = await user_factory(email="bob@example.com")
+    await profile_factory(user_id=user.id, username="bobsmith", first_name="Robert", last_name="Smith")
+
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "Robert"},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    first_names = [p["first_name"] for p in response.json()]
+    assert "Robert" in first_names
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_by_last_name(
+    client: AsyncClient,
+    user_factory: Callable[..., UserModel],
+    profile_factory: Callable[..., ProfileModel],
+    auth_header: dict[str, str],
+):
+    user: UserModel = await user_factory(email="charlie@example.com")
+    await profile_factory(user_id=user.id, username="charliex", first_name="Charlie", last_name="Johnson")
+
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "Johnson"},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    last_names = [p["last_name"] for p in response.json()]
+    assert "Johnson" in last_names
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_no_results(
+    client: AsyncClient,
+    auth_header: dict[str, str],
+):
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "zzznomatch999"},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_returns_list(
+    client: AsyncClient,
+    user_factory: Callable[..., UserModel],
+    profile_factory: Callable[..., ProfileModel],
+    auth_header: dict[str, str],
+):
+    for i in range(3):
+        user: UserModel = await user_factory(email=f"user{i}@example.com")
+        await profile_factory(user_id=user.id, username=f"searchuser{i}", first_name="Search", last_name=f"User{i}")
+
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "Search"},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()) >= 3
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_respects_limit(
+    client: AsyncClient,
+    user_factory: Callable[..., UserModel],
+    profile_factory: Callable[..., ProfileModel],
+    auth_header: dict[str, str],
+):
+    for i in range(5):
+        user: UserModel = await user_factory(email=f"limituser{i}@example.com")
+        await profile_factory(
+            user_id=user.id,
+            username=f"limituser{i}",
+            first_name="Limit",
+            last_name=f"User{i}",
+        )
+
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "Limit", "limit": 2},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()) <= 2
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_respects_offset(
+    client: AsyncClient,
+    user_factory: Callable[..., UserModel],
+    profile_factory: Callable[..., ProfileModel],
+    auth_header: dict[str, str],
+):
+    for i in range(4):
+        user: UserModel = await user_factory(email=f"offsetuser{i}@example.com")
+        await profile_factory(
+            user_id=user.id,
+            username=f"offsetuser{i}",
+            first_name="Offset",
+            last_name=f"User{i}",
+        )
+
+    all_response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "Offset", "limit": 30, "offset": 0},
+        headers=auth_header,
+    )
+    offset_response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "Offset", "limit": 30, "offset": 2},
+        headers=auth_header,
+    )
+
+    assert all_response.status_code == HTTPStatus.OK
+    assert offset_response.status_code == HTTPStatus.OK
+    assert len(offset_response.json()) < len(all_response.json())
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_unauthorized(client: AsyncClient):
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "test"},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_missing_query(
+    client: AsyncClient,
+    auth_header: dict[str, str],
+):
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_query_too_long(
+    client: AsyncClient,
+    auth_header: dict[str, str],
+):
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": "a" * 51},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_search_profiles_response_schema(
+    client: AsyncClient,
+    test_profile: ProfileModel,
+    auth_header: dict[str, str],
+):
+    response = await client.get(
+        "/api/v1/user/profile/search",
+        params={"query": test_profile.username},
+        headers=auth_header,
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    results = response.json()
+    assert len(results) >= 1
+
+    profile = results[0]
+    assert "id" in profile
+    assert "username" in profile
+    assert "first_name" in profile
+    assert "last_name" in profile
+    assert "gender" in profile
+    assert "birth_date" in profile
+    assert "avatar_url" in profile
+    assert "status" in profile
