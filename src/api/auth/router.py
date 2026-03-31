@@ -1,4 +1,4 @@
-from datetime import timedelta
+from fastapi import APIRouter, Depends, Query, status
 
 from api.auth.decorators import handle_auth_exceptions
 from api.auth.schemas import (
@@ -11,9 +11,6 @@ from api.auth.schemas import (
 )
 from core.auth.entities import UserCreationDTO, UserLoginDTO
 from core.auth.services import AuthService, get_auth_service
-from fastapi import APIRouter, Depends, Query, status
-
-from settings import settings
 
 
 auth_router = APIRouter(
@@ -49,9 +46,9 @@ async def confirm_email(
     token: str = Query(...),
     service: AuthService = Depends(get_auth_service)
 ):
-    token = service.verify_token(token, "email_confirm")
+    user_id = service.get_user_id_from_token_or_raise(token, "email_confirm")
 
-    await service.confirm_email(token["sub"])
+    await service.confirm_email(user_id)
 
 
 @auth_router.post(
@@ -66,20 +63,11 @@ async def login_user(
 ):
     dto = UserLoginDTO(**creds.model_dump())
 
-    user = await service.authenticate(dto)
-
-    access_token = service.create_token(
-        {"sub": str(user.id), "type": "access"},
-        expires_delta=timedelta(minutes=settings.security.access_ttl),
-    )
-    refresh_token = service.create_token(
-        {"sub": str(user.id), "type": "refresh"},
-        expires_delta=timedelta(days=settings.security.refresh_ttl),
-    )
+    tokens = await service.login(dto)
 
     return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
     }
 
 
@@ -93,16 +81,8 @@ async def refresh_user(
     token: TokenSchema,
     service: AuthService = Depends(get_auth_service)
 ):
-    user = service.verify_token(token.token, "refresh")
-
-    access_token = service.create_token(
-        data={"sub": user["sub"], "type": "access"},
-        expires_delta=timedelta(days=settings.security.access_ttl)
-    )
-
-    return {
-        "token": access_token
-    }
+    new_token = service.refresh(token.token)
+    return {"token": new_token}
 
 
 @auth_router.post(
@@ -127,6 +107,6 @@ async def reset_password(
     token: str = Query(...),
     service: AuthService = Depends(get_auth_service)
 ):
-    token = service.verify_token(token, "password_reset")
+    user_id = service.get_user_id_from_token_or_raise(token, "password_reset")
 
-    await service.change_password(token["sub"], new_password.new_password)
+    await service.change_password(user_id, new_password.new_password)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI
 
-from api.posts.router import posts_router
 from api.auth.router import auth_router
+from api.posts.router import posts_router
 from api.profile.router import profile_router
 
 

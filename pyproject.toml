@@ -68,6 +68,7 @@ ignore = [
 ]
 fixable = [
     "I",
+    "W293"
 ]
 
 [tool.ruff.lint.flake8-quotes]

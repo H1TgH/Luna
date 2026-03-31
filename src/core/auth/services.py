@@ -4,7 +4,9 @@ from typing import Any
 from uuid import UUID
 
 import bcrypt
-from core.auth.entities import AuthenticatedUserDTO, CurrentUserDTO, UserCreationDTO, UserLoginDTO
+from jose import ExpiredSignatureError, JWTError, jwt
+
+from core.auth.entities import AuthenticatedUserDTO, CurrentUserDTO, LoginTokensDTO, UserCreationDTO, UserLoginDTO
 from core.auth.exceptions import (
     EmailNotConfirmedException,
     InvalidCredentialsException,
@@ -13,60 +15,58 @@ from core.auth.exceptions import (
     UserDoesNotExistException,
 )
 from core.auth.tasks import send_confirmation_email, send_reset_password_email
+from infrastructure.database.models.users import UserModel
 from infrastructure.database.repositories.auth import AuthRepository
-from jose import ExpiredSignatureError, JWTError, jwt
-
 from infrastructure.database.uow import UnitOfWork
 from settings import settings
 
 
 class AuthService:
-    def __init__(self, uow: UnitOfWork):
+    def __init__(self, uow: UnitOfWork) -> None:
         self.uow = uow
 
     async def create(self, user: UserCreationDTO) -> None:
         async with self.uow() as session:
-            repository = AuthRepository(session)
+            repo = AuthRepository(session)
 
-            existing_user = await repository.get_by_email(user.email)
-            if existing_user:
-                raise UserAlreadyExistsException("User already exists")
-
-            hashed_password = await self.hash_password(user.password)
-            user.password = hashed_password
-
-            user = await repository.add(user)
+            await self._validate_uniqueness_user_email(repo, user.email)
+            user.password = await self.hash_password(user.password)
+            user = await repo.add(user)
 
             confirmation_token = self.create_token(
-                data={"sub": str(user.id), "type": "email_confirm"},
-                expires_delta=timedelta(minutes=15)
+                {"sub": str(user.id), "type": "email_confirm"},
+                timedelta(minutes=15)
             )
-            confirmation_url = f"{settings.app.base_url}/confirm-email?token={confirmation_token}"
+            url = self._get_email_confirmation_url(confirmation_token)
 
-            send_confirmation_email.delay(user.email, confirmation_url)
+            send_confirmation_email.delay(user.email, url)
 
-    async def authenticate(self, creds: UserLoginDTO) -> AuthenticatedUserDTO:
-        async with self.uow() as session:
-            repository = AuthRepository(session)
+    async def login(self, creds: UserLoginDTO) -> LoginTokensDTO:
+        user = await self._authenticate(creds)
 
-            user = await repository.get_by_email(creds.email)
-            if not user or not await self.verify_password(creds.password, user.password):
-                raise InvalidCredentialsException("Incorrect email or password")
+        access_token = self.create_token(
+            {"sub": str(user.id), "type": "access"},
+            timedelta(minutes=settings.security.access_ttl),
+        )
+        refresh_token = self.create_token(
+            {"sub": str(user.id), "type": "refresh"},
+            timedelta(days=settings.security.refresh_ttl),
+        )
 
-            dto = AuthenticatedUserDTO(id=user.id)
+        return LoginTokensDTO(access_token=access_token, refresh_token=refresh_token)
 
-        return dto
+    def refresh(self, refresh_token: str) -> str:
+        user_id = self.get_user_id_from_token_or_raise(refresh_token, "refresh")
+        return self.create_token(
+            {"sub": user_id, "type": "access"},
+            timedelta(minutes=settings.security.access_ttl)
+        )
 
     async def get_current_user(self, token: str) -> CurrentUserDTO:
         async with self.uow() as session:
-            repository = AuthRepository(session)
-
-            payload = self.verify_token(token, "access")
-            user_id = payload.get("sub")
-
-            user = await repository.get_by_id(user_id)
-            if not user:
-                raise UserDoesNotExistException("User does not exist")
+            repo = AuthRepository(session)
+            user_id = self.get_user_id_from_token_or_raise(token, "access")
+            user = await self._get_user_by_id_or_raise(repo, user_id)
 
             if not user.is_email_confirmed:
                 raise EmailNotConfirmedException("Email not confirmed")
@@ -80,41 +80,29 @@ class AuthService:
 
     async def confirm_email(self, user_id: UUID) -> None:
         async with self.uow() as session:
-            repository = AuthRepository(session)
+            repo = AuthRepository(session)
+            await self._get_user_by_id_or_raise(repo, user_id)
+            await repo.confirm_email(user_id)
 
-            user = await repository.get_by_id(user_id)
-            if not user:
-                raise UserDoesNotExistException("User does not exist")
-
-            await repository.confirm_email(user_id)
-
-    async def request_password_reset(self, email: str):
+    async def request_password_reset(self, email: str) -> None:
         async with self.uow() as session:
-            repository = AuthRepository(session)
-
-            user = await repository.get_by_email(email)
-            if user is None:
-                raise UserDoesNotExistException("User does not exist")
+            repo = AuthRepository(session)
+            user = await self._get_user_by_email_or_raise(repo, email)
 
             reset_token = self.create_token(
-                data={"sub": str(user.id), "type": "password_reset"},
-                expires_delta=timedelta(minutes=15)
+                {"sub": str(user.id), "type": "password_reset"},
+                timedelta(minutes=15)
             )
-            reset_url = f"{settings.app.base_url}/reset-password?token={reset_token}"
+            reset_url = self._get_password_reset_url(reset_token)
 
             send_reset_password_email.delay(email, reset_url)
 
     async def change_password(self, user_id: UUID, new_password: str) -> None:
         async with self.uow() as session:
-            repository = AuthRepository(session)
-
-            user = await repository.get_by_id(user_id)
-            if user is None:
-                raise UserDoesNotExistException("User does not exist")
-
-            hash = await self.hash_password(new_password)
-
-            await repository.reset_password(user_id, hash)
+            repo = AuthRepository(session)
+            await self._get_user_by_id_or_raise(repo, user_id)
+            hashed_password = await self.hash_password(new_password)
+            await repo.reset_password(user_id, hashed_password)
 
     @staticmethod
     async def hash_password(password: str) -> str:
@@ -145,6 +133,10 @@ class AuthService:
             settings.security.algorithm.get_secret_value()
         )
 
+    def get_user_id_from_token_or_raise(self, token: str, token_type: str) -> UUID:
+        payload = self.verify_token(token, token_type)
+        return payload.get("sub")
+
     @staticmethod
     def verify_token(token: str, token_type: str) -> dict[str, Any]:
         try:
@@ -162,6 +154,45 @@ class AuthService:
             raise InvalidTokenException("Invalid token type")
 
         return payload
+
+    async def _is_email_exists(self, repository: AuthRepository, email: str) -> bool:
+        return await repository.get_by_email(email) is not None
+
+    async def _validate_uniqueness_user_email(self, repository: AuthRepository, email: str) -> None:
+        if await self._is_email_exists(repository, email):
+            raise UserAlreadyExistsException("User already exists")
+
+    async def _validate_credentials(self, user: UserModel | None, password: str) -> None:
+        if not user or not await self.verify_password(password, user.password):
+            raise InvalidCredentialsException("Incorrect email or password")
+
+    async def _get_user_by_id_or_raise(self, repository: AuthRepository, user_id: UUID) -> UserModel:
+        user = await repository.get_by_id(user_id)
+        if not user:
+            raise UserDoesNotExistException("User does not exist")
+        return user
+
+    async def _get_user_by_email_or_raise(self, repository: AuthRepository, email: str) -> UserModel:
+        user = await repository.get_by_email(email)
+        if not user:
+            raise UserDoesNotExistException("User does not exist")
+        return user
+
+    def _get_email_confirmation_url(self, confirmation_token: str) -> str:
+        return f"{settings.app.base_url}/confirm-email?token={confirmation_token}"
+
+    def _get_password_reset_url(self, reset_token: str) -> str:
+        return f"{settings.app.base_url}/reset-password?token={reset_token}"
+
+    async def _authenticate(self, creds: UserLoginDTO) -> AuthenticatedUserDTO:
+        async with self.uow() as session:
+            repo = AuthRepository(session)
+            user = await repo.get_by_email(creds.email)
+            await self._validate_credentials(user, creds.password)
+
+            dto = AuthenticatedUserDTO(id=user.id)
+
+        return dto
 
 
 def get_auth_service() -> AuthService:

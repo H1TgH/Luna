@@ -23,3 +23,9 @@ class UserCreationDTO:
 class UserLoginDTO:
     email: str
     password: str
+
+
+@dataclass
+class LoginTokensDTO:
+    access_token: str
+    refresh_token: str

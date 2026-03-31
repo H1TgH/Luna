@@ -14,7 +14,7 @@ from infrastructure.database.models.users import UserModel
 async def test_user_register(client: AsyncClient, db_session: AsyncSession, user_auth_payload):
     payload = user_auth_payload()
 
-    with patch("core.users.auth.services.send_confirmation_email.delay") as mock_send:
+    with patch("core.auth.services.send_confirmation_email.delay") as mock_send:
         response = await client.post("/api/v1/users/auth/register", json=payload)
         mock_send.assert_called_once()
 
@@ -226,7 +226,7 @@ async def test_request_password_reset(
     client: AsyncClient,
     test_user: UserModel,
 ):
-    with patch("core.users.auth.services.send_reset_password_email.delay") as mock_send:
+    with patch("core.auth.services.send_reset_password_email.delay") as mock_send:
         response = await client.post(
             "/api/v1/users/auth/reset-password/request",
             json={"email": test_user.email},
@@ -238,7 +238,7 @@ async def test_request_password_reset(
 
 @pytest.mark.asyncio
 async def test_request_password_reset_nonexistent_user(client: AsyncClient):
-    with patch("core.users.auth.services.send_reset_password_email.delay"):
+    with patch("core.auth.services.send_reset_password_email.delay"):
         response = await client.post(
             "/api/v1/users/auth/reset-password/request",
             json={"email": "test@example.com"},

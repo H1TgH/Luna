@@ -11,9 +11,9 @@ from httpx import ASGITransport, AsyncClient
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.auth.services import AuthService, get_auth_service
 from core.posts.services import PostService, get_post_service
-from core.users.auth.services import AuthService, get_auth_service
-from core.users.profile.services import ProfileService, get_profile_service
+from core.profile.services import ProfileService, get_profile_service
 from infrastructure.database.models.posts import PostModel
 from infrastructure.database.models.profile import ProfileModel
 from infrastructure.database.models.users import UserModel
