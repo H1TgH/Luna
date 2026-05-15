@@ -12,6 +12,9 @@ from infrastructure.s3.storage import S3Storage
 from settings import settings
 
 
+MAX_IMAGES_PER_POST = 10
+
+
 class PostService:
     def __init__(self, uow: UnitOfWork, s3_storage: S3Storage, image_processor: ImageProcessor):
         self.uow = uow
@@ -22,148 +25,69 @@ class PostService:
         self,
         post_data: PostCreationDTO,
         author_id: UUID,
-        images: list[UploadImageDTO] | None = None
+        images: list[UploadImageDTO] | None = None,
     ) -> PostReadDTO:
-        if not post_data.content and not images:
-            raise EmptyPostException("Post must have content or at least one image")
+        self._validate_post(post_data, images)
+
+        image_dtos = await self._process_and_upload_images(images) if images else []
 
         async with self.uow() as session:
             repository = PostRepository(session)
+            result = await repository.add(author_id, post_data, image_dtos)
 
-            if images and len(images) > 10:
-                raise UnacceptableImageCountException("You can only add 10 images")
-
-            converted_images = []
-            if images:
-                upload_tasks = []
-                for index, image in enumerate(images):
-                    converted_image = await asyncio.to_thread(
-                        self.image_processor.convert_to_webp,
-                        image.data
-                    )
-                    file_name = str(uuid4()) + ".webp"
-
-                    upload_tasks.append(
-                        self.s3.upload(
-                            object_name=file_name,
-                            body=converted_image,
-                            content_type="image/webp"
-                        )
-                    )
-                    converted_images.append(PostImageDTO(object_key=file_name, order=index + 1))
-
-                await asyncio.gather(*upload_tasks)
-
-            result = await repository.add(author_id, post_data, converted_images)
-
-            if result.images:
-                result.images = [
-                    PostImageDTO(object_key=self.s3.get_file_url(img.object_key), order=img.order)
-                    for img in result.images
-                ]
-
-            return result
+        result.images = self._resolve_image_urls(result.images)
+        return result
 
     async def get_post_by_id(self, post_id: UUID, current_user_id: UUID) -> PostReadDTO:
         async with self.uow() as session:
             repository = PostRepository(session)
-
             post = await repository.get_by_id(post_id, current_user_id)
-            if post is None:
-                raise PostDoesNotExistException("Post does not exist")
 
-            images = []
-            for image in post.images:
-                url = self.s3.get_file_url(image.object_key)
-                images.append(PostImageDTO(object_key=url, order=image.order))
+        if post is None:
+            raise PostDoesNotExistException("Post does not exist")
 
-            return PostReadDTO(
-                id=post.id,
-                author_id=post.author_id,
-                content=post.content,
-                images=images,
-                created_at=post.created_at,
-                likes_count=post.likes_count,
-                is_current_user_likes=post.is_current_user_likes
-            )
+        post.images = self._resolve_image_urls(post.images)
+        return post
 
     async def get_user_posts(
         self,
         profile_id: UUID,
         current_user_id: UUID,
         cursor: datetime | None = None,
-        limit: int = 25
+        limit: int = 25,
     ) -> PostsPageDTO:
         async with self.uow() as session:
             repository = PostRepository(session)
-
             posts = await repository.get_user_posts(profile_id, current_user_id, cursor, limit + 1)
 
-            has_next = len(posts) > limit
-            posts = posts[:limit]
-            next_cursor = posts[-1].created_at if posts else None
+        has_next = len(posts) > limit
+        posts = posts[:limit]
+        next_cursor = posts[-1].created_at if posts else None
 
-            post_dtos = []
-            for post in posts:
-                images = []
-                for image in post.images:
-                    url = self.s3.get_file_url(image.object_key)
-                    images.append(PostImageDTO(object_key=url, order=image.order))
+        for post in posts:
+            post.images = self._resolve_image_urls(post.images)
 
-                post_dtos.append(
-                    PostReadDTO(
-                        id=post.id,
-                        author_id=post.author_id,
-                        content=post.content,
-                        images=images,
-                        created_at=post.created_at,
-                        likes_count=post.likes_count,
-                        is_current_user_likes=post.is_current_user_likes
-                    )
-                )
-
-            return PostsPageDTO(
-                posts=post_dtos,
-                has_next=has_next,
-                next_cursor=next_cursor
-            )
+        return PostsPageDTO(posts=posts, has_next=has_next, next_cursor=next_cursor)
 
     async def get_images(
         self,
         profile_id: UUID,
         cursor: datetime | None = None,
-        limit: int = 25
+        limit: int = 25,
     ) -> list[ImageDTO]:
-
         async with self.uow() as session:
             repository = PostRepository(session)
+            images = await repository.get_images(profile_id=profile_id, cursor=cursor, limit=limit)
 
-            images = await repository.get_images(
-                profile_id=profile_id,
-                cursor=cursor,
-                limit=limit
-            )
+        for image in images:
+            image.object_key = self.s3.get_file_url(image.object_key)
 
-            result = []
-
-            for image in images:
-                result.append(
-                    ImageDTO(
-                        post_id=image.post_id,
-                        created_at=image.created_at,
-                        object_key=self.s3.get_file_url(image.object_key)
-                    )
-                )
-
-            return result
+        return images
 
     async def put_like(self, post_id: UUID, current_user_id: UUID) -> None:
         async with self.uow() as session:
             repository = PostRepository(session)
-
-            post = await repository.get_post_or_none(post_id)
-            if post is None:
-                raise PostDoesNotExistException("Post does not exist")
+            await self._ensure_post_exists(repository, post_id)
 
             if not await repository.is_put_like(post_id, current_user_id):
                 await repository.add_like(post_id, current_user_id)
@@ -171,31 +95,58 @@ class PostService:
     async def remove_like(self, post_id: UUID, current_user_id: UUID) -> None:
         async with self.uow() as session:
             repository = PostRepository(session)
+            await self._ensure_post_exists(repository, post_id)
 
-            post = await repository.get_post_or_none(post_id)
-            if post is None:
-                raise PostDoesNotExistException("Post does not exist")
             if await repository.is_put_like(post_id, current_user_id):
                 await repository.delete_like(post_id, current_user_id)
 
-    async def delete(self, post_id: UUID, current_user_id) -> None:
+    async def delete(self, post_id: UUID, current_user_id: UUID) -> None:
         async with self.uow() as session:
             repository = PostRepository(session)
+            post = await self._ensure_post_exists(repository, post_id)
 
-            post = await repository.get_post_or_none(post_id)
-            if post is None:
-                raise PostDoesNotExistException("Post does not exist")
             if post.author_id != current_user_id:
                 raise PermissionDeniedException("You are not allowed to delete this post")
 
-            delete_tasks = []
-            for image in post.images:
-                delete_tasks.append(
-                    self.s3.delete(image.object_key)
-                )
-            await asyncio.gather(*delete_tasks)
-
+            await self._delete_post_images(post.images)
             await repository.delete(post_id)
+
+    def _validate_post(self, post_data: PostCreationDTO, images: list[UploadImageDTO] | None) -> None:
+        if not post_data.content and not images:
+            raise EmptyPostException("Post must have content or at least one image")
+
+        if images and len(images) > MAX_IMAGES_PER_POST:
+            raise UnacceptableImageCountException(f"You can only add {MAX_IMAGES_PER_POST} images")
+
+    async def _process_and_upload_images(self, images: list[UploadImageDTO]) -> list[PostImageDTO]:
+        upload_tasks = []
+        image_dtos = []
+
+        for index, image in enumerate(images):
+            converted = await asyncio.to_thread(self.image_processor.convert_to_webp, image.data)
+            file_name = f"{uuid4()}.webp"
+            upload_tasks.append(self.s3.upload(object_name=file_name, body=converted, content_type="image/webp"))
+            image_dtos.append(PostImageDTO(object_key=file_name, order=index + 1))
+
+        await asyncio.gather(*upload_tasks)
+        return image_dtos
+
+    def _resolve_image_urls(self, images: list[PostImageDTO] | None) -> list[PostImageDTO]:
+        if not images:
+            return []
+        return [PostImageDTO(object_key=self.s3.get_file_url(img.object_key), order=img.order) for img in images]
+
+    async def _delete_post_images(self, images: list[PostImageDTO]) -> None:
+        if not images:
+            return
+        await asyncio.gather(*[self.s3.delete(image.object_key) for image in images])
+
+    @staticmethod
+    async def _ensure_post_exists(repository: PostRepository, post_id: UUID):
+        post = await repository.get_post_or_none(post_id)
+        if post is None:
+            raise PostDoesNotExistException("Post does not exist")
+        return post
 
 
 def get_post_service() -> PostService:
@@ -206,7 +157,7 @@ def get_post_service() -> PostService:
             secret_key=settings.s3.secret_key.get_secret_value(),
             bucket_name="posts",
             internal_endpoint_url=settings.s3.internal_endpoint,
-            public_endpoint_url=settings.s3.public_endpoint
+            public_endpoint_url=settings.s3.public_endpoint,
         ),
-        image_processor=ImageProcessor()
+        image_processor=ImageProcessor(),
     )
