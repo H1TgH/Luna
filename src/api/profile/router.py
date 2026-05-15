@@ -1,12 +1,12 @@
 from dataclasses import asdict
 
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+
 from api.profile.decorators import handle_profile_exceptions
 from api.profile.schemas import ProfileCreationSchema, ProfileSchema, ProfileUpdateSchema
 from core.auth.entities import CurrentUserDTO
 from core.profile.entities import ProfileCreationDTO, ProfileUpdateDTO
 from core.profile.services import ProfileService, get_profile_service
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
-
 from dependencies import get_current_user
 
 
@@ -93,9 +93,7 @@ async def upload_avatar(
     service: ProfileService = Depends(get_profile_service)
 ):
     await service.upload_avatar(
-        file_name=avatar.filename,
         data=avatar.file,
-        content_type=avatar.content_type,
         user=current_user
     )
 

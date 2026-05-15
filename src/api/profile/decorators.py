@@ -1,7 +1,8 @@
 from functools import wraps
 
-from core.profile.exceptions import ProfileAlreadyExistsException, ProfileDoesNotExistException
 from fastapi import HTTPException, status
+
+from core.profile.exceptions import ProfileAlreadyExistsException, ProfileDoesNotExistException
 
 
 def handle_profile_exceptions(func):

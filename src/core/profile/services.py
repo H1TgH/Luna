@@ -1,117 +1,69 @@
 import asyncio
-from dataclasses import asdict
 from typing import BinaryIO
 from uuid import UUID
 
 from core.auth.entities import CurrentUserDTO
 from core.profile.entities import ProfileCreationDTO, ProfileReadDTO, ProfileUpdateDTO
 from core.profile.exceptions import ProfileAlreadyExistsException, ProfileDoesNotExistException
-
+from infrastructure.database.models.profile import ProfileModel
+from infrastructure.database.repositories.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
 from infrastructure.media.images.processor import ImageProcessor
 from infrastructure.s3.storage import S3Storage
 from settings import settings
-from infrastructure.database.repositories.profile import ProfileRepository
 
 
 class ProfileService:
-    def __init__(self, uow: UnitOfWork, s3_storage: S3Storage, image_processor: ImageProcessor):
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        s3_storage: S3Storage,
+        image_processor: ImageProcessor
+    ) -> None:
         self.uow = uow
         self.s3 = s3_storage
         self.image_processor = image_processor
 
-    def _build_avatar_url(self, avatar_key: str | None) -> str | None:
-        if not avatar_key:
-            return None
-        return self.s3.get_file_url(avatar_key)
-
     async def create(self, data: ProfileCreationDTO, user: CurrentUserDTO) -> None:
         async with self.uow() as session:
             repository = ProfileRepository(session)
-
-            existing_user_id = await repository.get_by_user_id(user.id)
-            if existing_user_id:
-                raise ProfileAlreadyExistsException("Profile already exists")
-
-            existing_username = await repository.get_by_username(data.username)
-            if existing_username:
-                raise ProfileAlreadyExistsException("Profile already exists")
-
+            await self._validate_profile_uniqueness(repository, data, user.id)
             await repository.add(data, user.id)
 
     async def get_by_user_id(self, user_id: UUID) -> ProfileReadDTO:
         async with self.uow() as session:
             repository = ProfileRepository(session)
-
-            profile = await repository.get_by_user_id(user_id)
-            if not profile:
-                raise ProfileDoesNotExistException("Profile does not exist")
-
-            dto = ProfileReadDTO(
-                id=profile.id,
-                username=profile.username,
-                first_name=profile.first_name,
-                last_name=profile.last_name,
-                birth_date=profile.birth_date,
-                gender=profile.gender,
-                avatar_url=self._build_avatar_url(profile.avatar_key),
-                status=profile.status
-            )
+            profile = await self._get_profile_by_id_or_raise(repository, user_id)
+            avatar_url = self._build_avatar_url(profile.avatar_key)
+            dto = ProfileReadDTO.from_model(profile, avatar_url)
 
         return dto
 
     async def get_by_username(self, username: str) -> ProfileReadDTO:
         async with self.uow() as session:
             repository = ProfileRepository(session)
-
-            profile = await repository.get_by_username(username)
-            if profile is None:
-                raise ProfileDoesNotExistException("Profile does not exist")
-
-            dto = ProfileReadDTO(
-                id=profile.id,
-                username=profile.username,
-                first_name=profile.first_name,
-                last_name=profile.last_name,
-                birth_date=profile.birth_date,
-                gender=profile.gender,
-                avatar_url=self._build_avatar_url(profile.avatar_key),
-                status=profile.status
-            )
+            profile = await self._get_profile_by_username_or_raise(repository, username)
+            avatar_url = self._build_avatar_url(profile.avatar_key)
+            dto = ProfileReadDTO.from_model(profile, avatar_url)
 
         return dto
 
     async def update(self, data: ProfileUpdateDTO, user: CurrentUserDTO) -> None:
+        update_data = self._validate_update_data(data)
         async with self.uow() as session:
             repository = ProfileRepository(session)
-
-            existing_profile = await repository.get_by_user_id(user.id)
-            if existing_profile is None:
-                raise ProfileDoesNotExistException("Profile does not exist")
-
-            update_data = {
-                k: v
-                for k, v in asdict(data).items()
-                if v is not None
-            }
-            if not update_data:
-                raise ValueError("No fields provided for update")
-
+            await self._get_profile_by_id_or_raise(repository, user.id)
             await repository.update(update_data, user.id)
 
     async def upload_avatar(
         self,
-        file_name: str,
         data: BinaryIO,
-        content_type: str,
         user: CurrentUserDTO
     ) -> None:
         async with self.uow() as session:
             repository = ProfileRepository(session)
 
-            profile = await repository.get_by_user_id(user.id)
-            if profile is None:
-                raise ProfileDoesNotExistException("Profile does not exist")
+            await self._get_profile_by_id_or_raise(repository, user.id)
 
             converted = await asyncio.to_thread(self.image_processor.convert_to_webp, data)
             object_key = f"{user.id}.webp"
@@ -135,21 +87,55 @@ class ProfileService:
                 return []
 
             return [
-                ProfileReadDTO(
-                    id=p.id,
-                    username=p.username,
-                    first_name=p.first_name,
-                    last_name=p.last_name,
-                    birth_date=p.birth_date,
-                    gender=p.gender,
-                    avatar_url=self._build_avatar_url(p.avatar_key),
-                    status=p.status
-                )
-                for p in profiles
+                ProfileReadDTO.from_model(profile, self._build_avatar_url(profile.avatar_key))
+                for profile in profiles
             ]
 
+    def _build_avatar_url(self, avatar_key: str | None) -> str | None:
+        if not avatar_key:
+            return None
+        return self.s3.get_file_url(avatar_key)
 
-def get_profile_service():
+    async def _validate_profile_uniqueness(
+        self,
+        repository: ProfileRepository,
+        data: ProfileCreationDTO,
+        user_id: UUID
+    ) -> None:
+        if await self._is_profile_id_exists(repository, user_id):
+            raise ProfileAlreadyExistsException("Profile already exists")
+        if await self._is_username_exist(repository, data.username):
+            raise ProfileAlreadyExistsException("Username already taken")
+
+    async def _is_profile_id_exists(self, repository: ProfileRepository, user_id: UUID) -> bool:
+        return await repository.get_by_user_id(user_id) is not None
+
+    async def _is_username_exist(self, repository: ProfileRepository, username: str) -> bool:
+        return await repository.get_by_username(username) is not None
+
+    async def _get_profile_by_id_or_raise(self, repository: ProfileRepository, user_id: UUID) -> ProfileModel:
+        profile = await repository.get_by_user_id(user_id)
+        if not profile:
+            raise ProfileDoesNotExistException("Profile does not exist")
+
+        return profile
+
+    async def _get_profile_by_username_or_raise(self, repository: ProfileRepository, username: str) -> ProfileModel:
+        profile = await repository.get_by_username(username)
+        if not profile:
+            raise ProfileDoesNotExistException("Profile does not exist")
+
+        return profile
+
+    def _validate_update_data(self, data: ProfileUpdateDTO) -> dict:
+        update_data = data.to_update_dict()
+        if not update_data:
+            raise ValueError("No fields provided for update")
+
+        return update_data
+
+
+def get_profile_service() -> ProfileService:
     return ProfileService(
         uow=UnitOfWork(),
         s3_storage=S3Storage(

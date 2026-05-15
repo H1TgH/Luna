@@ -1,10 +1,10 @@
 from typing import Any
 from uuid import UUID
 
-from core.profile.entities import ProfileCreationDTO
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.profile.entities import ProfileCreationDTO
 from infrastructure.database.models.profile import ProfileModel
 
 
@@ -32,13 +32,11 @@ class ProfileRepository:
     async def get_by_user_id(self, user_id: UUID) -> ProfileModel:
         stmt = select(ProfileModel).where(ProfileModel.id == user_id)
         result = await self.session.execute(stmt)
-
         return result.scalar_one_or_none()
 
     async def get_by_username(self, username: str) -> ProfileModel:
         stmt = select(ProfileModel).where(ProfileModel.username == username)
         result = await self.session.execute(stmt)
-
         return result.scalar_one_or_none()
 
     async def search(
