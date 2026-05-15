@@ -25,13 +25,11 @@ class AuthRepository:
     async def get_by_email(self, email: str) -> UserModel | None:
         stmt = select(UserModel).where(UserModel.email == email)
         result = await self.session.execute(stmt)
-
         return result.scalar_one_or_none()
 
     async def get_by_id(self, user_id: UUID) -> UserModel | None:
         stmt = select(UserModel).where(UserModel.id == user_id)
         result = await self.session.execute(stmt)
-
         return result.scalar_one_or_none()
 
     async def confirm_email(self, user_id: UUID) -> None:
