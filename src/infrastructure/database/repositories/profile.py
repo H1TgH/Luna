@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -38,6 +39,10 @@ class ProfileRepository:
         stmt = select(ProfileModel).where(ProfileModel.username == username)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def update_last_seen(self, user_id: UUID, new_last_seen: datetime) -> None:
+        stmt = update(ProfileModel).where(ProfileModel.id == user_id).values(last_seen=new_last_seen)
+        await self.session.execute(stmt)
 
     async def search(
         self,
