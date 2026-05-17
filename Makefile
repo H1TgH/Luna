@@ -5,7 +5,7 @@ down:
 	docker compose down
 
 build:
-	docker compose up --build
+	docker compose up --build -d
 
 prod-up:
 	docker compose -f docker-compose.yml up -d
@@ -28,3 +28,6 @@ test-cov:
 		--cov-report=term-missing \
 		--cov-report=html
 	docker compose -f docker-compose.test.yml down
+
+uv export:
+	uv export --format requirements.txt > requirements.txt --no-hashes

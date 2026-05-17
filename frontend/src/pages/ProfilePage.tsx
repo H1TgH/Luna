@@ -7,6 +7,7 @@ import type { ProfileResponse, PostResponse, PostImageResponse } from '../types'
 import { useMeStore } from '../store/meStore'
 import { useMe } from '../hooks/useMe'
 import Header from '../components/layout/Header'
+import { isOnline, formatLastSeen } from '../utils/presenceUtils'
 
 const getPostImageUrl = (key: string) =>
   key.startsWith('http') ? key : `/api/v1/files/${key}`
@@ -234,11 +235,11 @@ function ImageGrid({ images, onImageClick }: {
   }
 
   if (count === 1) return (
-      <div style={{ borderRadius: '12px', overflow: 'hidden' }}>
-        <img src={getPostImageUrl(sorted[0].object_key)} alt=""
-          style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'cover', display: 'block', cursor: 'pointer', transition: 'opacity 0.15s' }}
-          onClick={() => onImageClick(0)} {...hoverHandlers} />
-      </div>
+    <div style={{ borderRadius: '12px', overflow: 'hidden' }}>
+      <img src={getPostImageUrl(sorted[0].object_key)} alt=""
+        style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'cover', display: 'block', cursor: 'pointer', transition: 'opacity 0.15s' }}
+        onClick={() => onImageClick(0)} {...hoverHandlers} />
+    </div>
   )
 
   const cell = (src: string, idx: number, extra?: React.ReactNode): React.ReactElement => (
@@ -463,11 +464,11 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
   const MAX_IMAGES = 10
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setContent(e.target.value)
-      const scrollY = window.scrollY
-      e.target.style.height = 'auto'
-      e.target.style.height = e.target.scrollHeight + 'px'
-      window.scrollTo({ top: scrollY })
+    setContent(e.target.value)
+    const scrollY = window.scrollY
+    e.target.style.height = 'auto'
+    e.target.style.height = e.target.scrollHeight + 'px'
+    window.scrollTo({ top: scrollY })
   }
 
   const handleFiles = (files: FileList | File[] | null) => {
@@ -645,6 +646,47 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
               )}
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Онлайн-индикатор с тултипом ────────────────────────────────────────────
+function OnlineIndicator({ lastSeen }: { lastSeen: string }) {
+  const online = isOnline(lastSeen)
+  const [hovered, setHovered] = useState(false)
+  const label = online ? 'В сети' : formatLastSeen(lastSeen)
+
+  return (
+    <div
+      style={{ position: 'absolute', bottom: '4px', right: '4px' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Точка */}
+      <div style={{
+        width: '14px', height: '14px', borderRadius: '50%',
+        background: online ? '#22c55e' : 'rgba(107,114,156,0.5)',
+        border: '2.5px solid #06091a',
+        transition: 'background 0.3s',
+      }} />
+
+      {/* Тултип */}
+      {hovered && (
+        <div style={{
+          position: 'absolute', bottom: '20px', left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(12,16,40,0.97)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '8px', padding: '5px 10px',
+          fontSize: '12px', color: online ? '#86efac' : 'rgba(107,114,156,0.8)',
+          fontFamily: "'Outfit', sans-serif",
+          whiteSpace: 'nowrap', pointerEvents: 'none',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          zIndex: 10,
+        }}>
+          {label}
         </div>
       )}
     </div>
@@ -870,13 +912,13 @@ export default function ProfilePage() {
     <div style={{ minHeight: '100vh', background: '#06091a', color: '#e8ecf8' }}>
       <Header />
 
-      {/* ↓ Widened from 680px to 860px */}
       <div style={{ maxWidth: '860px', margin: '0 auto', padding: '36px 32px 80px' }}>
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: '22px',
           marginBottom: '32px', paddingBottom: '28px',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
+          {/* Аватар с онлайн-индикатором */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <div
               onClick={() => isOwnProfile && avatarInputRef.current?.click()}
@@ -926,11 +968,8 @@ export default function ProfilePage() {
               )}
             </div>
 
-            <div style={{
-              position: 'absolute', bottom: '4px', right: '4px',
-              width: '14px', height: '14px', borderRadius: '50%',
-              background: '#22c55e', border: '2.5px solid #06091a',
-            }} />
+            {/* Онлайн-индикатор — теперь реальный, с тултипом */}
+            <OnlineIndicator lastSeen={viewedProfile.last_seen} />
 
             {isOwnProfile && (
               <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
@@ -949,6 +988,28 @@ export default function ProfilePage() {
               fontFamily: "'Outfit', sans-serif", margin: '3px 0 0',
             }}>
               @{viewedProfile.username}
+            </p>
+
+            {/* Статус онлайн под именем (текстовый) */}
+            <p style={{
+              fontSize: '12.5px',
+              color: isOnline(viewedProfile.last_seen) ? 'rgba(134,239,172,0.7)' : 'rgba(107,114,156,0.45)',
+              fontFamily: "'Outfit', sans-serif",
+              margin: '4px 0 0',
+              display: 'flex', alignItems: 'center', gap: '5px',
+            }}>
+              {isOnline(viewedProfile.last_seen) ? (
+                <>
+                  <span style={{
+                    display: 'inline-block', width: '6px', height: '6px',
+                    borderRadius: '50%', background: '#22c55e',
+                    boxShadow: '0 0 6px rgba(34,197,94,0.6)',
+                  }} />
+                  В сети
+                </>
+              ) : (
+                formatLastSeen(viewedProfile.last_seen)
+              )}
             </p>
 
             {viewedProfile.status && (

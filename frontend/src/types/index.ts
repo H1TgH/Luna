@@ -12,6 +12,7 @@ export interface ProfileResponse {
   birth_date: string
   avatar_url: string | null
   status: string | null
+  last_seen: string
 }
 
 export interface ProfileCreateRequest {
