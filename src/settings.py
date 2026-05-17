@@ -49,6 +49,7 @@ class RedisSettings(BaseSettings):
     port: int
 
     celery_db: int
+    presense_db: int
 
     @property
     def celery_url(self) -> str:
