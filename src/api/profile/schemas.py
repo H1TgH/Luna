@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -23,6 +23,7 @@ class ProfileSchema(BaseModel):
     birth_date: date
     avatar_url: str | None
     status: str | None
+    last_seen: datetime
 
 
 class ProfileUpdateSchema(BaseModel):

@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from core.profile.enums import GenderEnum
@@ -25,6 +25,7 @@ class ProfileReadDTO:
     birth_date: date
     avatar_url: str | None
     status: str | None
+    last_seen: datetime
 
     @classmethod
     def from_model(cls, profile: ProfileModel, avatar_url: str | None) -> "ProfileReadDTO":
@@ -36,7 +37,8 @@ class ProfileReadDTO:
             birth_date=profile.birth_date,
             gender=profile.gender,
             avatar_url=avatar_url,
-            status=profile.status
+            status=profile.status,
+            last_seen=profile.last_seen,
         )
 
 
