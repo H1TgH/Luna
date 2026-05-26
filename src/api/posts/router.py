@@ -4,9 +4,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from api.posts.decorators import handle_post_exceptions
-from api.posts.schemas import ImageSchema, PostPageSchema, PostReadSchema
+from api.posts.schemas import (
+    CommentCreationSchema,
+    CommentReadSchema,
+    CommentsPageSchema,
+    CommentsReplyPageSchema,
+    ImageSchema,
+    PostPageSchema,
+    PostReadSchema,
+)
 from core.auth.entities import CurrentUserDTO
-from core.posts.entities import PostCreationDTO, UploadImageDTO
+from core.posts.entities import CommentCreationDTO, PostCreationDTO, UploadImageDTO
 from core.posts.services import PostService, get_post_service
 from dependencies import get_current_user
 
@@ -39,7 +47,7 @@ async def create_post(
                 content_type=image.content_type
             ))
 
-    return await service.create(
+    return await service.add_post(
         post_data=post_dto,
         author_id=current_user.id,
         images=images_dto
@@ -134,7 +142,7 @@ async def delete_post(
     current_user: CurrentUserDTO = Depends(get_current_user),
     service: PostService = Depends(get_post_service)
 ):
-    await service.delete(post_id, current_user.id)
+    await service.delete_post(post_id, current_user.id)
 
 
 @posts_router.post(
@@ -161,3 +169,69 @@ async def remove_like(
     service: PostService = Depends(get_post_service)
 ):
     await service.remove_like(post_id, current_user.id)
+
+
+@posts_router.post(
+    "/{post_id}/comments",
+    status_code=201,
+    response_model=CommentReadSchema
+)
+@handle_post_exceptions
+async def create_comment(
+    post_id: UUID,
+    data: CommentCreationSchema,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: PostService = Depends(get_post_service)
+):
+    dto = CommentCreationDTO(
+        post_id=post_id,
+        author_id=current_user.id,
+        parent_id=data.parent_id,
+        text=data.text
+    )
+    return await service.create_comment(dto)
+
+
+@posts_router.get(
+    "/comments/{post_id}",
+    status_code=200,
+    response_model=CommentsPageSchema
+)
+@handle_post_exceptions
+async def get_root_comments(
+    post_id: UUID,
+    limit: int = Query(15, ge=1, le=50),
+    cursor: datetime | None = Query(None),
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: PostService = Depends(get_post_service)
+):
+    return await service.get_root_comments(post_id, limit, cursor)
+
+
+@posts_router.get(
+    "/comments/{comment_id}/replies",
+    status_code=200,
+    response_model=CommentsReplyPageSchema
+)
+@handle_post_exceptions
+async def get_comment_replies(
+    comment_id: UUID,
+    limit: int = Query(15, ge=1, le=50),
+    cursor: datetime | None = Query(None),
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: PostService = Depends(get_post_service)
+):
+    return await service.get_comment_replies(comment_id, limit, cursor)
+
+
+@posts_router.delete(
+    "/comments/{comment_id}",
+    status_code=204
+)
+@handle_post_exceptions
+async def delete_comment(
+    comment_id: UUID,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: PostService = Depends(get_post_service)
+):
+    return await service.delete_comment(comment_id, current_user.id)

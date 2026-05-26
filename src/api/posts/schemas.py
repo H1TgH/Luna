@@ -29,3 +29,49 @@ class ImageSchema(BaseModel):
     post_id: UUID
     object_key: str
     created_at: datetime
+
+
+class CommentCreationSchema(BaseModel):
+    parent_id: UUID | None
+    text: str
+
+
+class CommentReadSchema(BaseModel):
+    id: UUID
+    post_id: UUID
+    author_id: UUID
+    parent_id: UUID | None
+    text: str
+    created_at: datetime
+
+
+class CommentListItemSchema(BaseModel):
+    id: UUID
+    post_id: UUID
+    author_id: UUID
+    parent_id: UUID | None
+    text: str
+    created_at: datetime
+    reply_count: int
+    has_replies: bool
+
+
+class CommentsPageSchema(BaseModel):
+    comments: list[CommentListItemSchema]
+    next_cursor: datetime | None
+    has_next: bool
+
+
+class CommentReplySchema(BaseModel):
+    id: UUID
+    post_id: UUID
+    author_id: UUID
+    parent_id: UUID | None
+    text: str
+    created_at: datetime
+
+
+class CommentsReplyPageSchema(BaseModel):
+    comments: list[CommentReplySchema]
+    next_cursor: datetime | None
+    has_next: bool
