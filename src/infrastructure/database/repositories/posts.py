@@ -1,19 +1,28 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
-from core.posts.entities import ImageDTO, PostCreationDTO, PostImageDTO, PostReadDTO
-from infrastructure.database.models.posts import PostImageModel, PostLikeModel, PostModel
+from core.posts.entities import (
+    CommentCreationDTO,
+    CommentListItemDTO,
+    CommentReadDTO,
+    CommentReplyDTO,
+    ImageDTO,
+    PostCreationDTO,
+    PostImageDTO,
+    PostReadDTO,
+)
+from infrastructure.database.models.posts import PostCommentModel, PostImageModel, PostLikeModel, PostModel
 
 
 class PostRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def add(
+    async def add_post(
         self,
         author_id: UUID,
         post_data: PostCreationDTO,
@@ -117,9 +126,167 @@ class PostRepository:
         return result.scalar_one_or_none() is not None
 
     async def delete(self, post_id: UUID) -> None:
-        await self.session.execute(delete(PostModel).where(PostModel.id == post_id))
+        await self.session.execute(
+            delete(PostModel)
+            .where(PostModel.id == post_id)
+        )
 
-    # --- private helpers ---
+    async def create_comment(self, comment_data: CommentCreationDTO) -> CommentReadDTO:
+        comment = PostCommentModel(
+            author_id=comment_data.author_id,
+            post_id=comment_data.post_id,
+            parent_id=comment_data.parent_id,
+            text=comment_data.text
+        )
+        self.session.add(comment)
+        await self.session.flush()
+
+        return CommentReadDTO(
+            id=comment.id,
+            author_id=comment.author_id,
+            parent_id=comment.parent_id,
+            post_id=comment.post_id,
+            text=comment.text,
+            created_at=comment.created_at
+        )
+
+    async def get_post_comments(
+        self,
+        post_id: UUID,
+        limit: int = 15,
+        cursor: datetime | None = None
+    ) -> list[CommentReadDTO]:
+        stmt = (
+            select(PostCommentModel)
+            .where(PostCommentModel.post_id == post_id)
+            .order_by(PostCommentModel.created_at.desc())
+            .limit(limit)
+        )
+        if cursor is not None:
+            stmt = stmt.where(PostCommentModel.created_at < cursor)
+        result = await self.session.execute(stmt)
+        comments = list(result.scalars().all())
+        if not comments:
+            return []
+
+        return [
+            self._build_comment_read_dto(comment)
+            for comment in comments
+        ]
+
+    async def get_root_comments(
+        self,
+        post_id: UUID,
+        limit: int = 15,
+        cursor: datetime | None = None
+    ) -> list[CommentListItemDTO]:
+        reply = aliased(PostCommentModel)
+
+        stmt = (
+            select(
+                PostCommentModel,
+                func.count(reply.id).label("reply_count")
+            )
+            .outerjoin(
+                reply,
+                reply.parent_id == PostCommentModel.id
+            )
+            .where(
+                PostCommentModel.post_id == post_id,
+                PostCommentModel.parent_id.is_(None)
+            )
+            .group_by(PostCommentModel.id)
+            .order_by(PostCommentModel.created_at.desc())
+            .limit(limit)
+        )
+
+        if cursor is not None:
+            stmt = stmt.where(
+                PostCommentModel.created_at < cursor
+            )
+
+        result = await self.session.execute(stmt)
+        comments = result.all()
+        if not comments:
+            return []
+
+        return [
+            CommentListItemDTO(
+                id=comment.id,
+                post_id=comment.post_id,
+                author_id=comment.author_id,
+                parent_id=comment.parent_id,
+                text=comment.text,
+                created_at=comment.created_at,
+                reply_count=reply_count,
+                has_replies=reply_count > 0,
+            )
+            for comment, reply_count in comments
+        ]
+
+    async def get_comment_or_none(self, comment_id: UUID) -> CommentReadDTO | None:
+        stmt = select(PostCommentModel).where(PostCommentModel.id == comment_id)
+        result = await self.session.execute(stmt)
+        comment = result.scalar_one_or_none()
+        if comment is None:
+            return None
+
+        return CommentReadDTO(
+            id=comment.id,
+            post_id=comment.post_id,
+            author_id=comment.author_id,
+            parent_id=comment.parent_id,
+            text=comment.text,
+            created_at=comment.created_at
+        )
+
+    async def get_comment_replies(
+        self,
+        comment_id: UUID,
+        limit: int = 10,
+        cursor: datetime | None = None
+    ) -> list[CommentListItemDTO]:
+        stmt = (
+            select(PostCommentModel)
+            .where(PostCommentModel.parent_id == comment_id)
+            .order_by(PostCommentModel.created_at.desc())
+            .limit(limit)
+        )
+
+        if cursor is not None:
+            stmt = stmt.where(
+                PostCommentModel.created_at < cursor
+            )
+
+        result = await self.session.execute(stmt)
+        comments = result.scalars().all()
+        if not comments:
+            return []
+
+        return [
+            CommentReplyDTO(
+                id=comment.id,
+                post_id=comment.post_id,
+                author_id=comment.author_id,
+                parent_id=comment.parent_id,
+                text=comment.text,
+                created_at=comment.created_at,
+            )
+            for comment in comments
+        ]
+
+    async def update_comment_text(self, comment_id: UUID, new_text: str) -> None:
+        await self.session.execute(
+            update(PostCommentModel)
+            .where(PostCommentModel.id == comment_id)
+            .values(text=new_text)
+        )
+
+    async def delete_comment(self, comment_id: UUID) -> None:
+        await self.session.execute(
+            delete(PostCommentModel)
+            .where(PostCommentModel.id == comment_id)
+        )
 
     async def _save_images(self, post_id: UUID, images: list[PostImageDTO]) -> list[PostImageDTO]:
         saved = []
@@ -190,4 +357,15 @@ class PostRepository:
             created_at=post.created_at,
             likes_count=likes_count,
             is_current_user_likes=is_liked,
+        )
+
+    @staticmethod
+    def _build_comment_read_dto(comment: PostCommentModel) -> CommentReadDTO:
+        return CommentReadDTO(
+            id=comment.id,
+            post_id=comment.post_id,
+            author_id=comment.author_id,
+            parent_id=comment.parent_id,
+            text=comment.text,
+            created_at=comment.created_at,
         )

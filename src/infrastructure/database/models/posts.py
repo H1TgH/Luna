@@ -37,6 +37,11 @@ class PostModel(Base):
         "ProfileModel"
     )
 
+    comments: Mapped[list["PostCommentModel"]] = relationship(
+        "PostCommentModel",
+        back_populates="post"
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         PGDateTime(timezone=True),
         nullable=False,
@@ -97,4 +102,57 @@ class PostLikeModel(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("post_id", "user_id"),
+    )
+
+
+class PostCommentModel(Base):
+    __tablename__ = "post_comments"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID,
+        primary_key=True,
+        default=uuid4,
+    )
+
+    post_id: Mapped[UUID] = mapped_column(
+        PGUUID,
+        ForeignKey("posts.id", ondelete="CASCADE"),
+    )
+
+    author_id: Mapped[UUID] = mapped_column(
+        PGUUID,
+        ForeignKey("profiles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    parent_id: Mapped[UUID] = mapped_column(
+        PGUUID,
+        ForeignKey("post_comments.id", ondelete="CASCADE"),
+        nullable=True
+    )
+
+    text: Mapped[str] = mapped_column(
+        String,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        PGDateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    post: Mapped["PostModel"] = relationship(
+        "PostModel",
+        back_populates="comments",
+    )
+
+    replies: Mapped[list["PostCommentModel"]] = relationship(
+        "PostCommentModel",
+        back_populates="parent",
+    )
+
+    parent: Mapped["PostCommentModel"] = relationship(
+        "PostCommentModel",
+        back_populates="replies",
+        remote_side=[id],
     )
