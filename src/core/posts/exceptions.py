@@ -8,3 +8,11 @@ class UnacceptableImageCountException(Exception):
 
 class EmptyPostException(Exception):
     pass
+
+
+class CommentDoesNotExistException(Exception):
+    pass
+
+
+class InvalidCommentParentException(Exception):
+    pass

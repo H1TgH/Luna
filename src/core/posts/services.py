@@ -3,8 +3,26 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from core.exceptions import PermissionDeniedException
-from core.posts.entities import ImageDTO, PostCreationDTO, PostImageDTO, PostReadDTO, PostsPageDTO, UploadImageDTO
-from core.posts.exceptions import EmptyPostException, PostDoesNotExistException, UnacceptableImageCountException
+from core.posts.entities import (
+    CommentCreationDTO,
+    CommentListItemDTO,
+    CommentReadDTO,
+    CommentsPageDTO,
+    CommentsReplyPageDTO,
+    ImageDTO,
+    PostCreationDTO,
+    PostImageDTO,
+    PostReadDTO,
+    PostsPageDTO,
+    UploadImageDTO,
+)
+from core.posts.exceptions import (
+    CommentDoesNotExistException,
+    EmptyPostException,
+    InvalidCommentParentException,
+    PostDoesNotExistException,
+    UnacceptableImageCountException,
+)
 from infrastructure.database.repositories.posts import PostRepository
 from infrastructure.database.uow import UnitOfWork
 from infrastructure.media.images.processor import ImageProcessor
@@ -21,7 +39,7 @@ class PostService:
         self.s3 = s3_storage
         self.image_processor = image_processor
 
-    async def create(
+    async def add_post(
         self,
         post_data: PostCreationDTO,
         author_id: UUID,
@@ -33,7 +51,7 @@ class PostService:
 
         async with self.uow() as session:
             repository = PostRepository(session)
-            result = await repository.add(author_id, post_data, image_dtos)
+            result = await repository.add_post(author_id, post_data, image_dtos)
 
         result.images = self._resolve_image_urls(result.images)
         return result
@@ -100,16 +118,80 @@ class PostService:
             if await repository.is_put_like(post_id, current_user_id):
                 await repository.delete_like(post_id, current_user_id)
 
-    async def delete(self, post_id: UUID, current_user_id: UUID) -> None:
+    async def delete_post(self, post_id: UUID, current_user_id: UUID) -> None:
         async with self.uow() as session:
             repository = PostRepository(session)
             post = await self._ensure_post_exists(repository, post_id)
-
             if post.author_id != current_user_id:
                 raise PermissionDeniedException("You are not allowed to delete this post")
 
             await self._delete_post_images(post.images)
             await repository.delete(post_id)
+
+    async def create_comment(
+        self,
+        data: CommentCreationDTO
+    ) -> CommentReadDTO:
+
+        async with self.uow() as session:
+            repository = PostRepository(session)
+
+            post = await repository.get_post(
+                data.post_id
+            )
+            if post is None:
+                raise PostDoesNotExistException("Post does not exist")
+
+            if data.parent_id:
+                parent = await repository.get_comment(
+                    data.parent_id
+                )
+                if parent is None:
+                    raise CommentDoesNotExistException("Comment does not exist")
+                if parent.post_id != data.post_id:
+                    raise InvalidCommentParentException()
+
+            return await repository.create_comment(data)
+
+    async def get_root_comments(
+        self,
+        post_id: UUID,
+        limit: int = 15,
+        cursor: datetime | None = None
+    ) -> list[CommentListItemDTO]:
+        async with self.uow() as session:
+            repository = PostRepository(session)
+            comments = await repository.get_root_comments(post_id, limit + 1, cursor)
+
+            has_next = len(comments) > limit
+            comments = comments[:limit]
+            next_cursor = comments[-1].created_at if comments else None
+
+            return CommentsPageDTO(comments, next_cursor, has_next)
+
+    async def get_comment_replies(
+        self,
+        comment_id: UUID,
+        limit: int = 10,
+        cursor: datetime | None = None
+    ) -> list[CommentListItemDTO]:
+        async with self.uow() as session:
+            repository = PostRepository(session)
+            comments = await repository.get_comment_replies(comment_id, limit + 1, cursor)
+
+            has_next = len(comments) > limit
+            comments = comments[:limit]
+            next_cursor = comments[-1].created_at if comments else None
+
+            return CommentsReplyPageDTO(comments, next_cursor, has_next)
+
+    async def delete_comment(self, comment_id: UUID, current_user_id: UUID) -> None:
+        async with self.uow() as session:
+            repository = PostRepository(session)
+            comment = await self._ensure_comment_exists(repository, comment_id)
+            if comment.author_id != current_user_id:
+                raise PermissionDeniedException("You are not allowed to delete this comment")
+            await repository.delete_comment(comment_id)
 
     def _validate_post(self, post_data: PostCreationDTO, images: list[UploadImageDTO] | None) -> None:
         if not post_data.content and not images:
@@ -147,6 +229,13 @@ class PostService:
         if post is None:
             raise PostDoesNotExistException("Post does not exist")
         return post
+
+    @staticmethod
+    async def _ensure_comment_exists(repository: PostRepository, comment_id: UUID) -> CommentReadDTO:
+        comment = await repository.get_comment_or_none(comment_id)
+        if comment is None:
+            raise CommentDoesNotExistException("Comment does not exist")
+        return comment
 
 
 def get_post_service() -> PostService:

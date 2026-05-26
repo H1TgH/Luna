@@ -15,7 +15,7 @@ class PresenseRepository:
         )
 
     async def set_online(self, user_id: UUID) -> None:
-        await self.redis_client.set(f"{user_id}:online", 1, ex=45)
+        await self.redis_client.set(f"{user_id}:online", 1, ex=60)
 
     async def set_offline(self, user_id) -> None:
         async with self.redis_client.pipeline(transaction=True) as pipe:

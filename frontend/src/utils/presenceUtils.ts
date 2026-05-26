@@ -1,4 +1,4 @@
-const ONLINE_THRESHOLD_MS = 3 * 60 * 1000 // 3 минуты
+const ONLINE_THRESHOLD_MS = 60 * 1000 // 1 минута
 
 export function isOnline(lastSeenIso: string | null | undefined): boolean {
   if (!lastSeenIso) return false
