@@ -15,6 +15,7 @@ class PostReadSchema(BaseModel):
     created_at: datetime
     likes_count: int
     is_current_user_likes: bool
+    comments_count: int
     content: str | None = None
     images: list[PostImageSchema] | None = None
 
@@ -36,10 +37,17 @@ class CommentCreationSchema(BaseModel):
     text: str
 
 
+class CommentAuthorSchema(BaseModel):
+    author_id: UUID
+    username: str
+    first_name: str
+    last_name: str
+    avatar_url: str | None
+
 class CommentReadSchema(BaseModel):
     id: UUID
     post_id: UUID
-    author_id: UUID
+    author: CommentAuthorSchema
     parent_id: UUID | None
     text: str
     created_at: datetime
@@ -48,7 +56,7 @@ class CommentReadSchema(BaseModel):
 class CommentListItemSchema(BaseModel):
     id: UUID
     post_id: UUID
-    author_id: UUID
+    author: CommentAuthorSchema
     parent_id: UUID | None
     text: str
     created_at: datetime
@@ -65,7 +73,7 @@ class CommentsPageSchema(BaseModel):
 class CommentReplySchema(BaseModel):
     id: UUID
     post_id: UUID
-    author_id: UUID
+    author: CommentAuthorSchema
     parent_id: UUID | None
     text: str
     created_at: datetime

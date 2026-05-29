@@ -3,9 +3,10 @@ from uuid import UUID
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.orm import selectinload
 
 from core.posts.entities import (
+    CommentAuthorDTO,
     CommentCreationDTO,
     CommentListItemDTO,
     CommentReadDTO,
@@ -16,6 +17,7 @@ from core.posts.entities import (
     PostReadDTO,
 )
 from infrastructure.database.models.posts import PostCommentModel, PostImageModel, PostLikeModel, PostModel
+from infrastructure.database.models.profile import ProfileModel
 
 
 class PostRepository:
@@ -42,6 +44,7 @@ class PostRepository:
             is_current_user_likes=False,
             content=post.content,
             images=image_dtos,
+            comments_count=0
         )
 
     async def get_user_posts(
@@ -58,9 +61,10 @@ class PostRepository:
         post_ids = [p.id for p in posts]
         likes_count_map = await self._fetch_likes_counts(post_ids)
         user_liked_ids = await self._fetch_user_liked_post_ids(post_ids, current_user_id)
+        comments_count = await self._fetch_comments_count(post_ids)
 
         return [
-            self._build_post_read_dto(post, likes_count_map.get(post.id, 0), post.id in user_liked_ids)
+            self._build_post_read_dto(post, likes_count_map.get(post.id, 0), post.id in user_liked_ids, comments_count.get(post.id, 0))
             for post in posts
         ]
 
@@ -131,23 +135,24 @@ class PostRepository:
             .where(PostModel.id == post_id)
         )
 
-    async def create_comment(self, comment_data: CommentCreationDTO) -> CommentReadDTO:
+    async def create_comment(self, comment_data: CommentCreationDTO, root_comment_id: UUID | None) -> PostCommentModel:
         comment = PostCommentModel(
             author_id=comment_data.author_id,
             post_id=comment_data.post_id,
             parent_id=comment_data.parent_id,
+            root_comment_id=root_comment_id,
             text=comment_data.text
         )
         self.session.add(comment)
         await self.session.flush()
 
-        return CommentReadDTO(
-            id=comment.id,
-            author_id=comment.author_id,
-            parent_id=comment.parent_id,
-            post_id=comment.post_id,
-            text=comment.text,
-            created_at=comment.created_at
+        return comment
+
+    async def update_thread_replies_count(self, root_comment_id: UUID, value: int) -> None:
+        await self.session.execute(
+            update(PostCommentModel)
+            .where(PostCommentModel.id == root_comment_id)
+            .values(thread_replies_count=PostCommentModel.thread_replies_count + value)
         )
 
     async def get_post_comments(
@@ -180,26 +185,16 @@ class PostRepository:
         limit: int = 15,
         cursor: datetime | None = None
     ) -> list[CommentListItemDTO]:
-        reply = aliased(PostCommentModel)
-
         stmt = (
-            select(
-                PostCommentModel,
-                func.count(reply.id).label("reply_count")
-            )
-            .outerjoin(
-                reply,
-                reply.parent_id == PostCommentModel.id
-            )
+            select(PostCommentModel, ProfileModel)
             .where(
                 PostCommentModel.post_id == post_id,
-                PostCommentModel.parent_id.is_(None)
+                PostCommentModel.parent_id.is_(None),
+                PostCommentModel.root_comment_id.is_(None),
             )
-            .group_by(PostCommentModel.id)
-            .order_by(PostCommentModel.created_at.desc())
+            .join(ProfileModel, PostCommentModel.author_id == ProfileModel.id)
             .limit(limit)
         )
-
         if cursor is not None:
             stmt = stmt.where(
                 PostCommentModel.created_at < cursor
@@ -214,14 +209,20 @@ class PostRepository:
             CommentListItemDTO(
                 id=comment.id,
                 post_id=comment.post_id,
-                author_id=comment.author_id,
+                author=CommentAuthorDTO(
+                    author_id=profile.id,
+                    username=profile.username,
+                    first_name=profile.first_name,
+                    last_name=profile.last_name,
+                    avatar_url=profile.avatar_key
+                ),
                 parent_id=comment.parent_id,
                 text=comment.text,
                 created_at=comment.created_at,
-                reply_count=reply_count,
-                has_replies=reply_count > 0,
+                reply_count=comment.thread_replies_count,
+                has_replies=comment.thread_replies_count > 0,
             )
-            for comment, reply_count in comments
+            for comment, profile in comments
         ]
 
     async def get_comment_or_none(self, comment_id: UUID) -> CommentReadDTO | None:
@@ -231,35 +232,27 @@ class PostRepository:
         if comment is None:
             return None
 
-        return CommentReadDTO(
-            id=comment.id,
-            post_id=comment.post_id,
-            author_id=comment.author_id,
-            parent_id=comment.parent_id,
-            text=comment.text,
-            created_at=comment.created_at
-        )
+        return self._build_comment_read_dto(comment)
 
-    async def get_comment_replies(
+    async def get_comment_thread(
         self,
-        comment_id: UUID,
+        root_comment_id: UUID,
         limit: int = 10,
         cursor: datetime | None = None
     ) -> list[CommentListItemDTO]:
         stmt = (
-            select(PostCommentModel)
-            .where(PostCommentModel.parent_id == comment_id)
-            .order_by(PostCommentModel.created_at.desc())
+            select(PostCommentModel, ProfileModel)
+            .where(PostCommentModel.root_comment_id == root_comment_id)
+            .join(ProfileModel, PostCommentModel.author_id == ProfileModel.id)
             .limit(limit)
         )
-
         if cursor is not None:
             stmt = stmt.where(
                 PostCommentModel.created_at < cursor
             )
 
         result = await self.session.execute(stmt)
-        comments = result.scalars().all()
+        comments = result.all()
         if not comments:
             return []
 
@@ -267,12 +260,19 @@ class PostRepository:
             CommentReplyDTO(
                 id=comment.id,
                 post_id=comment.post_id,
-                author_id=comment.author_id,
+                author=CommentAuthorDTO(
+                    author_id=profile.id,
+                    username=profile.username,
+                    first_name=profile.first_name,
+                    last_name=profile.last_name,
+                    avatar_url=profile.avatar_key
+                ),
+                root_comment_id=comment.root_comment_id,
                 parent_id=comment.parent_id,
                 text=comment.text,
                 created_at=comment.created_at,
             )
-            for comment in comments
+            for comment, profile in comments
         ]
 
     async def update_comment_text(self, comment_id: UUID, new_text: str) -> None:
@@ -334,6 +334,15 @@ class PostRepository:
         result = await self.session.execute(stmt)
         return dict(result.all())
 
+    async def _fetch_comments_count(self, post_ids: list[UUID]) -> dict[UUID, int]:
+        stmt = (
+            select(PostCommentModel.post_id, func.count(PostCommentModel.id))
+            .where(PostCommentModel.post_id.in_(post_ids))
+            .group_by(PostCommentModel.post_id)
+        )
+        result = await self.session.execute(stmt)
+        return dict(result.all())
+
     async def _fetch_user_liked_post_ids(self, post_ids: list[UUID], user_id: UUID) -> set[UUID]:
         stmt = select(PostLikeModel.post_id).where(
             PostLikeModel.post_id.in_(post_ids),
@@ -348,7 +357,7 @@ class PostRepository:
         return result.scalar() or 0
 
     @staticmethod
-    def _build_post_read_dto(post: PostModel, likes_count: int, is_liked: bool) -> PostReadDTO:
+    def _build_post_read_dto(post: PostModel, likes_count: int, is_liked: bool, comments_count: int) -> PostReadDTO:
         return PostReadDTO(
             id=post.id,
             author_id=post.author_id,
@@ -357,6 +366,7 @@ class PostRepository:
             created_at=post.created_at,
             likes_count=likes_count,
             is_current_user_likes=is_liked,
+            comments_count=comments_count
         )
 
     @staticmethod
@@ -365,6 +375,7 @@ class PostRepository:
             id=comment.id,
             post_id=comment.post_id,
             author_id=comment.author_id,
+            root_comment_id=comment.root_comment_id,
             parent_id=comment.parent_id,
             text=comment.text,
             created_at=comment.created_at,

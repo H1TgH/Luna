@@ -6,7 +6,6 @@ from core.exceptions import PermissionDeniedException
 from core.posts.entities import (
     CommentCreationDTO,
     CommentListItemDTO,
-    CommentReadDTO,
     CommentsPageDTO,
     CommentsReplyPageDTO,
     ImageDTO,
@@ -15,6 +14,8 @@ from core.posts.entities import (
     PostReadDTO,
     PostsPageDTO,
     UploadImageDTO,
+    CommentAuthorDTO,
+    CommentReadDTO,
 )
 from core.posts.exceptions import (
     CommentDoesNotExistException,
@@ -24,6 +25,7 @@ from core.posts.exceptions import (
     UnacceptableImageCountException,
 )
 from infrastructure.database.repositories.posts import PostRepository
+from infrastructure.database.repositories.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
 from infrastructure.media.images.processor import ImageProcessor
 from infrastructure.s3.storage import S3Storage
@@ -128,37 +130,56 @@ class PostService:
             await self._delete_post_images(post.images)
             await repository.delete(post_id)
 
-    async def create_comment(
-        self,
-        data: CommentCreationDTO
-    ) -> CommentReadDTO:
-
+    async def create_comment(self, data: CommentCreationDTO) -> CommentListItemDTO:
         async with self.uow() as session:
-            repository = PostRepository(session)
+            post_repository = PostRepository(session)
+            profile_repository = ProfileRepository(session)
 
-            post = await repository.get_post(
-                data.post_id
-            )
-            if post is None:
-                raise PostDoesNotExistException("Post does not exist")
+            post = await post_repository.get_post_or_none(data.post_id)
+            if not post:
+                raise PostDoesNotExistException
 
+            root_comment_id = None
             if data.parent_id:
-                parent = await repository.get_comment(
-                    data.parent_id
-                )
-                if parent is None:
-                    raise CommentDoesNotExistException("Comment does not exist")
-                if parent.post_id != data.post_id:
-                    raise InvalidCommentParentException()
+                parent = await post_repository.get_comment_or_none(data.parent_id)
+                if not parent or parent.post_id != data.post_id:
+                    raise InvalidCommentParentException
 
-            return await repository.create_comment(data)
+                root_comment_id = (
+                    parent.id if parent.parent_id is None
+                    else parent.root_comment_id
+                )
+
+            comment = await post_repository.create_comment(data, root_comment_id)
+            if root_comment_id is not None:
+                await post_repository.update_thread_replies_count(root_comment_id, 1)
+
+            author = await profile_repository.get_by_user_id(data.author_id)
+            author_dto = CommentAuthorDTO(
+                author_id=author.id,
+                username=author.username,
+                first_name=author.first_name,
+                last_name=author.last_name,
+                avatar_url=f"{self.s3.public_endpoint}/media/avatars/{author.avatar_key}"
+            )
+
+            return CommentListItemDTO(
+                id=comment.id,
+                post_id=comment.post_id,
+                author=author_dto,
+                parent_id=comment.parent_id,
+                text=comment.text,
+                created_at=comment.created_at,
+                reply_count=0,
+                has_replies=False
+            )
 
     async def get_root_comments(
         self,
         post_id: UUID,
         limit: int = 15,
         cursor: datetime | None = None
-    ) -> list[CommentListItemDTO]:
+    ) -> CommentsPageDTO:
         async with self.uow() as session:
             repository = PostRepository(session)
             comments = await repository.get_root_comments(post_id, limit + 1, cursor)
@@ -167,9 +188,12 @@ class PostService:
             comments = comments[:limit]
             next_cursor = comments[-1].created_at if comments else None
 
+            for comment in comments:
+                comment.author.avatar_url = f"{self.s3.public_endpoint}/media/avatars/{comment.author.avatar_url}"
+
             return CommentsPageDTO(comments, next_cursor, has_next)
 
-    async def get_comment_replies(
+    async def get_comment_thread(
         self,
         comment_id: UUID,
         limit: int = 10,
@@ -177,11 +201,14 @@ class PostService:
     ) -> list[CommentListItemDTO]:
         async with self.uow() as session:
             repository = PostRepository(session)
-            comments = await repository.get_comment_replies(comment_id, limit + 1, cursor)
+            comments = await repository.get_comment_thread(comment_id, limit + 1, cursor)
 
             has_next = len(comments) > limit
             comments = comments[:limit]
             next_cursor = comments[-1].created_at if comments else None
+
+            for comment in comments:
+                comment.author.avatar_url = f"{self.s3.public_endpoint}/media/avatars/{comment.author.avatar_url}"
 
             return CommentsReplyPageDTO(comments, next_cursor, has_next)
 
@@ -236,6 +263,11 @@ class PostService:
         if comment is None:
             raise CommentDoesNotExistException("Comment does not exist")
         return comment
+
+    def _build_avatar_url(self, avatar_key: str | None) -> str | None:  # Метод из ProfileService, в дальнейшем вынести в отдельный класс  # noqa: E501
+        if not avatar_key:
+            return None
+        return self.s3.get_file_url(avatar_key)
 
 
 def get_post_service() -> PostService:

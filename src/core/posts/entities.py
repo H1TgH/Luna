@@ -29,6 +29,7 @@ class PostReadDTO:
     created_at: datetime
     likes_count: int
     is_current_user_likes: bool
+    comments_count: int
     content: str | None = None
     images: list[PostImageDTO] | None = None
 
@@ -56,11 +57,20 @@ class CommentCreationDTO:
 
 
 @dataclass
+class CommentAuthorDTO:
+    author_id: UUID
+    username: str
+    first_name: str
+    last_name: str
+    avatar_url: str | None
+
+@dataclass
 class CommentReadDTO:
     id: UUID
     post_id: UUID
-    author_id: UUID
+    author_id: CommentAuthorDTO
     parent_id: UUID | None
+    root_comment_id: UUID | None
     text: str
     created_at: datetime
 
@@ -69,7 +79,7 @@ class CommentReadDTO:
 class CommentListItemDTO:
     id: UUID
     post_id: UUID
-    author_id: UUID
+    author: CommentAuthorDTO
     parent_id: UUID | None
     text: str
     created_at: datetime
@@ -81,8 +91,9 @@ class CommentListItemDTO:
 class CommentReplyDTO:
     id: UUID
     post_id: UUID
-    author_id: UUID
+    author: CommentAuthorDTO
     parent_id: UUID | None
+    root_comment_id: UUID | None
     text: str
     created_at: datetime
 

@@ -193,7 +193,7 @@ async def create_comment(
 
 
 @posts_router.get(
-    "/comments/{post_id}",
+    "/comments/{post_id}/root",
     status_code=200,
     response_model=CommentsPageSchema
 )
@@ -209,7 +209,7 @@ async def get_root_comments(
 
 
 @posts_router.get(
-    "/comments/{comment_id}/replies",
+    "/comments/{comment_id}/thread",
     status_code=200,
     response_model=CommentsReplyPageSchema
 )
@@ -221,7 +221,7 @@ async def get_comment_replies(
     current_user: CurrentUserDTO = Depends(get_current_user),
     service: PostService = Depends(get_post_service)
 ):
-    return await service.get_comment_replies(comment_id, limit, cursor)
+    return await service.get_comment_thread(comment_id, limit, cursor)
 
 
 @posts_router.delete(
