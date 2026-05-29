@@ -1,11 +1,12 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime as PGDateTime, ForeignKey, PrimaryKeyConstraint, SmallInteger, String, func
+from sqlalchemy import DateTime as PGDateTime, ForeignKey, Integer, PrimaryKeyConstraint, SmallInteger, String, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from infrastructure.database.database import Base
+from infrastructure.database.models.profile import ProfileModel
 
 
 class PostModel(Base):
@@ -131,6 +132,17 @@ class PostCommentModel(Base):
         nullable=True
     )
 
+    root_comment_id: Mapped[UUID] = mapped_column(
+        PGUUID,
+        ForeignKey("post_comments.id", ondelete="CASCADE"),
+        nullable=True
+    )
+
+    thread_replies_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0
+    )
+
     text: Mapped[str] = mapped_column(
         String,
     )
@@ -146,13 +158,6 @@ class PostCommentModel(Base):
         back_populates="comments",
     )
 
-    replies: Mapped[list["PostCommentModel"]] = relationship(
-        "PostCommentModel",
-        back_populates="parent",
-    )
-
-    parent: Mapped["PostCommentModel"] = relationship(
-        "PostCommentModel",
-        back_populates="replies",
-        remote_side=[id],
+    author: Mapped["ProfileModel"] = relationship(
+        "ProfileModel"
     )

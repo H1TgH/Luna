@@ -36,10 +36,35 @@ export interface PostResponse {
   is_current_user_likes: boolean
   content: string | null
   images: PostImageResponse[] | null
+  comments_count: number
 }
 
 export interface PostsPageResponse {
   posts: PostResponse[]
+  next_cursor: string | null
+  has_next: boolean
+}
+
+export interface CommentResponse {
+  id: string
+  post_id: string
+  author_id: string
+  parent_id: string | null
+  text: string
+  created_at: string
+  reply_count: number
+  has_replies: boolean
+  author: {
+    id: string
+    username: string
+    first_name: string
+    last_name: string
+    avatar_url: string | null
+  }
+}
+
+export interface CommentsPageResponse {
+  comments: CommentResponse[]
   next_cursor: string | null
   has_next: boolean
 }

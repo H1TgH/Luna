@@ -8,6 +8,7 @@ import { useMeStore } from '../store/meStore'
 import { useMe } from '../hooks/useMe'
 import Header from '../components/layout/Header'
 import { isOnline, formatLastSeen } from '../utils/presenceUtils'
+import CommentDrawer from '../components/ui/CommentDrawer'
 
 const getPostImageUrl = (key: string) =>
   key.startsWith('http') ? key : `/api/v1/files/${key}`
@@ -300,6 +301,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [showComments, setShowComments] = useState(false)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -420,17 +422,24 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
           {post.likes_count > 0 && <span>{post.likes_count}</span>}
         </button>
 
-        <button disabled title="Комментарии — скоро" style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          background: 'none', border: 'none', cursor: 'default',
-          padding: '7px 10px', borderRadius: '8px',
-          color: 'rgba(107,114,156,0.3)', fontSize: '13px',
-          fontFamily: "'Outfit', sans-serif",
-        }}>
+        <button
+          onClick={() => setShowComments(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: 'none', border: 'none',
+            cursor: 'pointer',
+            padding: '7px 10px', borderRadius: '8px',
+            color: 'rgba(107,114,156,0.8)', fontSize: '13px',
+            fontFamily: "'Outfit', sans-serif",
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#8b7fe8'; e.currentTarget.style.background = 'rgba(139,127,232,0.1)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(107,114,156,0.8)'; e.currentTarget.style.background = 'none' }}
+        >
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path d="M2 2.5h11a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H8L5 13.5v-3H2a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z"
-              stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+            <path d="M2 2.5h11a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H8L5 13.5v-3H2a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
           </svg>
+          {post.comments_count > 0 && <span>{post.comments_count}</span>}
         </button>
 
         <button disabled title="Репосты — скоро" style={{
@@ -448,6 +457,12 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
           </svg>
         </button>
       </div>
+      <CommentDrawer 
+        postId={post.id} 
+        isOpen={showComments} 
+        onClose={() => setShowComments(false)} 
+        commentsCount={post.comments_count} 
+      />
     </article>
   )
 }
