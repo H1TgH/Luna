@@ -2,9 +2,10 @@ from datetime import datetime
 from uuid import UUID
 
 from core.exceptions import PermissionDeniedException
-from core.posts.entities import CommentCreationDTO, CommentDTO, CommentsPageDTO
+from core.posts.entities import CommentAuthorDTO, CommentCreationDTO, CommentDTO, CommentsPageDTO
 from core.posts.exceptions import CommentDoesNotExistException, InvalidCommentParentException, PostDoesNotExistException
 from infrastructure.database.models.posts import PostCommentModel
+from infrastructure.database.models.profile import ProfileModel
 from infrastructure.database.repositories.comment import CommentRepository
 from infrastructure.database.repositories.posts import PostRepository
 from infrastructure.database.repositories.profile import ProfileRepository
@@ -34,9 +35,8 @@ class CommentService:
                 await comment_repo.update_thread_replies_count(root_comment_id, 1)
 
             author = await profile_repository.get_by_user_id(data.author_id)
-            comment.author.avatar_url = self._build_avatar_url(comment.author.avatar_url)
-
-            return comment_repo._build_comment_dto(comment, author)
+            avatar_url = self._build_avatar_url(comment.author.avatar_key)
+            return self._build_comment_dto(comment, author, avatar_url)
 
     async def get_root_comments(
         self,
@@ -117,6 +117,29 @@ class CommentService:
         if parent is None:
             raise InvalidCommentParentException("Parent comment does not exist")
         return parent
+
+    def _build_comment_dto(self, comment: PostCommentModel, author: ProfileModel, avatar_url: str) -> CommentDTO:
+        return CommentDTO(
+            id=comment.id,
+            author=self._build_comment_author_dto(author, avatar_url),
+            post_id=comment.post_id,
+            parent_id=comment.parent_id,
+            text=comment.text,
+            root_comment_id=comment.root_comment_id,
+            created_at=comment.created_at,
+            replies_count=comment.thread_replies_count,
+            has_replies=comment.thread_replies_count > 0,
+        )
+
+    @staticmethod
+    def _build_comment_author_dto(author: ProfileModel, avatar_url: str) -> CommentAuthorDTO:
+        return CommentAuthorDTO(
+            author_id=author.id,
+            username=author.username,
+            first_name=author.first_name,
+            last_name=author.last_name,
+            avatar_url=avatar_url
+        )
 
 
 def get_comment_service() -> CommentService:
