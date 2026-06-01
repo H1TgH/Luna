@@ -44,42 +44,19 @@ class CommentAuthorSchema(BaseModel):
     last_name: str
     avatar_url: str | None
 
-class CommentReadSchema(BaseModel):
+
+class CommentSchema(BaseModel):
     id: UUID
-    post_id: UUID
     author: CommentAuthorSchema
+    post_id: UUID
     parent_id: UUID | None
     text: str
+    root_comment_id: UUID | None
     created_at: datetime
-
-
-class CommentListItemSchema(BaseModel):
-    id: UUID
-    post_id: UUID
-    author: CommentAuthorSchema
-    parent_id: UUID | None
-    text: str
-    created_at: datetime
-    reply_count: int
-    has_replies: bool
+    replies_count: int = 0
 
 
 class CommentsPageSchema(BaseModel):
-    comments: list[CommentListItemSchema]
-    next_cursor: datetime | None
-    has_next: bool
-
-
-class CommentReplySchema(BaseModel):
-    id: UUID
-    post_id: UUID
-    author: CommentAuthorSchema
-    parent_id: UUID | None
-    text: str
-    created_at: datetime
-
-
-class CommentsReplyPageSchema(BaseModel):
-    comments: list[CommentReplySchema]
+    comments: list[CommentSchema]
     next_cursor: datetime | None
     has_next: bool

@@ -6,16 +6,16 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from api.posts.decorators import handle_post_exceptions
 from api.posts.schemas import (
     CommentCreationSchema,
-    CommentReadSchema,
+    CommentSchema,
     CommentsPageSchema,
-    CommentsReplyPageSchema,
     ImageSchema,
     PostPageSchema,
     PostReadSchema,
 )
 from core.auth.entities import CurrentUserDTO
 from core.posts.entities import CommentCreationDTO, PostCreationDTO, UploadImageDTO
-from core.posts.services import PostService, get_post_service
+from core.posts.services.comment import CommentService, get_comment_service
+from core.posts.services.post import PostService, get_post_service
 from dependencies import get_current_user
 
 
@@ -174,14 +174,14 @@ async def remove_like(
 @posts_router.post(
     "/{post_id}/comments",
     status_code=201,
-    response_model=CommentReadSchema
+    response_model=CommentSchema
 )
 @handle_post_exceptions
 async def create_comment(
     post_id: UUID,
     data: CommentCreationSchema,
     current_user: CurrentUserDTO = Depends(get_current_user),
-    service: PostService = Depends(get_post_service)
+    service: CommentService = Depends(get_comment_service)
 ):
     dto = CommentCreationDTO(
         post_id=post_id,
@@ -203,7 +203,7 @@ async def get_root_comments(
     limit: int = Query(15, ge=1, le=50),
     cursor: datetime | None = Query(None),
     current_user: CurrentUserDTO = Depends(get_current_user),
-    service: PostService = Depends(get_post_service)
+    service: CommentService = Depends(get_comment_service)
 ):
     return await service.get_root_comments(post_id, limit, cursor)
 
@@ -211,7 +211,7 @@ async def get_root_comments(
 @posts_router.get(
     "/comments/{comment_id}/thread",
     status_code=200,
-    response_model=CommentsReplyPageSchema
+    response_model=CommentsPageSchema
 )
 @handle_post_exceptions
 async def get_comment_replies(
@@ -219,7 +219,7 @@ async def get_comment_replies(
     limit: int = Query(15, ge=1, le=50),
     cursor: datetime | None = Query(None),
     current_user: CurrentUserDTO = Depends(get_current_user),
-    service: PostService = Depends(get_post_service)
+    service: CommentService = Depends(get_comment_service)
 ):
     return await service.get_comment_thread(comment_id, limit, cursor)
 
@@ -232,6 +232,6 @@ async def get_comment_replies(
 async def delete_comment(
     comment_id: UUID,
     current_user: CurrentUserDTO = Depends(get_current_user),
-    service: PostService = Depends(get_post_service)
+    service: CommentService = Depends(get_comment_service)
 ):
     return await service.delete_comment(comment_id, current_user.id)

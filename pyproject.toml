@@ -65,7 +65,7 @@ ignore = [
     "RUF002",
     "RUF003",
     "S110",
-
+    "FURB140",
 ]
 fixable = [
     "I",

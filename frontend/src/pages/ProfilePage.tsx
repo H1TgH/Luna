@@ -8,7 +8,7 @@ import { useMeStore } from '../store/meStore'
 import { useMe } from '../hooks/useMe'
 import Header from '../components/layout/Header'
 import { isOnline, formatLastSeen } from '../utils/presenceUtils'
-import CommentDrawer from '../components/ui/CommentDrawer'
+import CommentSection from '../components/ui/CommentSection'
 
 const getPostImageUrl = (key: string) =>
   key.startsWith('http') ? key : `/api/v1/files/${key}`
@@ -291,18 +291,19 @@ function ImageGrid({ images, onImageClick }: {
   )
 }
 
-function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: {
+function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, onCountChange }: {
   post: PostResponse
   isOwn: boolean
   myProfileId: string | null
   onDelete: (id: string) => void
   onLike: (id: string, liked: boolean) => void
   onImageClick: (images: PostImageResponse[], index: number) => void
+  onCountChange: (postId: string, delta: number) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [showComments, setShowComments] = useState(false)
-
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false)
+ 
   useEffect(() => {
     if (!menuOpen) return
     const handler = (e: MouseEvent) => {
@@ -311,7 +312,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [menuOpen])
-
+ 
   return (
     <article style={{
       background: 'rgba(255,255,255,0.028)',
@@ -323,7 +324,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
         <span style={{ fontSize: '13px', color: 'rgba(107,114,156,0.65)', fontFamily: "'Outfit', sans-serif" }}>
           {formatDate(post.created_at)}
         </span>
-
+ 
         {isOwn && (
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
@@ -342,7 +343,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
                 <circle cx="8" cy="12.5" r="1.2" fill="currentColor" />
               </svg>
             </button>
-
+ 
             {menuOpen && (
               <div style={{
                 position: 'absolute', right: 0, top: '100%', marginTop: '4px',
@@ -373,7 +374,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
           </div>
         )}
       </div>
-
+ 
       {post.content && (
         <p style={{
           fontSize: '15px', color: '#d4d8ef', lineHeight: 1.65,
@@ -383,11 +384,11 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
           {post.content}
         </p>
       )}
-
+ 
       {post.images && post.images.length > 0 && (
         <ImageGrid images={post.images} onImageClick={(i) => onImageClick(post.images!, i)} />
       )}
-
+ 
       <div style={{
         display: 'flex', alignItems: 'center', gap: '2px',
         paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)',
@@ -421,27 +422,32 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
           </svg>
           {post.likes_count > 0 && <span>{post.likes_count}</span>}
         </button>
-
+ 
         <button
-          onClick={() => setShowComments(true)}
+          onClick={() => setIsCommentsOpen(p => !p)}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px',
-            background: 'none', border: 'none',
-            cursor: 'pointer',
+            background: isCommentsOpen ? 'rgba(139,127,232,0.1)' : 'none',
+            border: 'none', cursor: 'pointer',
             padding: '7px 10px', borderRadius: '8px',
-            color: 'rgba(107,114,156,0.8)', fontSize: '13px',
-            fontFamily: "'Outfit', sans-serif",
+            color: isCommentsOpen ? '#a99ef0' : 'rgba(107,114,156,0.8)',
+            fontSize: '13px', fontFamily: "'Outfit', sans-serif",
             transition: 'all 0.2s',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = '#8b7fe8'; e.currentTarget.style.background = 'rgba(139,127,232,0.1)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(107,114,156,0.8)'; e.currentTarget.style.background = 'none' }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = isCommentsOpen ? '#a99ef0' : 'rgba(107,114,156,0.8)'
+            e.currentTarget.style.background = isCommentsOpen ? 'rgba(139,127,232,0.1)' : 'none'
+          }}
         >
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path d="M2 2.5h11a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H8L5 13.5v-3H2a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+            <path d="M2 2.5h11a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H8L5 13.5v-3H2a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z"
+              stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
+              fill={isCommentsOpen ? 'currentColor' : 'none'} fillOpacity={isCommentsOpen ? 0.15 : 0} />
           </svg>
           {post.comments_count > 0 && <span>{post.comments_count}</span>}
         </button>
-
+ 
         <button disabled title="Репосты — скоро" style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           background: 'none', border: 'none', cursor: 'default',
@@ -457,11 +463,12 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick }: 
           </svg>
         </button>
       </div>
-      <CommentDrawer 
-        postId={post.id} 
-        isOpen={showComments} 
-        onClose={() => setShowComments(false)} 
-        commentsCount={post.comments_count} 
+ 
+      <CommentSection
+        postId={post.id}
+        isOpen={isCommentsOpen}
+        commentsCount={post.comments_count}
+        onCountChange={(delta) => onCountChange(post.id, delta)}
       />
     </article>
   )
@@ -866,6 +873,12 @@ export default function ProfilePage() {
     }
   }
 
+  const handleCountChange = (postId: string, delta: number) => {
+    setPosts(prev => prev.map(p =>
+      p.id === postId ? { ...p, comments_count: p.comments_count + delta } : p
+    ))
+  }
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -1113,6 +1126,7 @@ export default function ProfilePage() {
                   onDelete={handleDelete}
                   onLike={handleLike}
                   onImageClick={openLightbox}
+                  onCountChange={handleCountChange}
                 />
               ))}
 
@@ -1431,3 +1445,13 @@ function EditSelectGender({ value, onChange }: {
     </div>
   )
 }
+
+// ---- В ProfilePage добавить handleCountChange и передать в PostCard ----
+// const handleCountChange = (postId: string, delta: number) => {
+//   setPosts(prev => prev.map(p =>
+//     p.id === postId ? { ...p, comments_count: p.comments_count + delta } : p
+//   ))
+// }
+//
+// В JSX PostCard добавить проп:
+// onCountChange={handleCountChange}

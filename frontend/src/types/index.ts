@@ -45,22 +45,25 @@ export interface PostsPageResponse {
   has_next: boolean
 }
 
+export interface CommentAuthorResponse {
+  id: string
+  username: string
+  first_name: string
+  last_name: string
+  avatar_url: string | null
+}
+
 export interface CommentResponse {
   id: string
   post_id: string
   author_id: string
   parent_id: string | null
+  root_comment_id: string | null
   text: string
   created_at: string
   reply_count: number
   has_replies: boolean
-  author: {
-    id: string
-    username: string
-    first_name: string
-    last_name: string
-    avatar_url: string | null
-  }
+  author: CommentAuthorResponse
 }
 
 export interface CommentsPageResponse {

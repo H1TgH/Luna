@@ -64,49 +64,22 @@ class CommentAuthorDTO:
     last_name: str
     avatar_url: str | None
 
-@dataclass
-class CommentReadDTO:
-    id: UUID
-    post_id: UUID
-    author_id: CommentAuthorDTO
-    parent_id: UUID | None
-    root_comment_id: UUID | None
-    text: str
-    created_at: datetime
-
 
 @dataclass
-class CommentListItemDTO:
+class CommentDTO:
     id: UUID
-    post_id: UUID
     author: CommentAuthorDTO
-    parent_id: UUID | None
-    text: str
-    created_at: datetime
-    reply_count: int
-    has_replies: bool
-
-
-@dataclass
-class CommentReplyDTO:
-    id: UUID
     post_id: UUID
-    author: CommentAuthorDTO
     parent_id: UUID | None
-    root_comment_id: UUID | None
     text: str
+    root_comment_id: UUID | None
     created_at: datetime
+    replies_count: int = 0
+    has_replies: bool = False
 
 
 @dataclass
 class CommentsPageDTO:
-    comments: list[CommentListItemDTO]
-    next_cursor: datetime | None
-    has_next: bool
-
-
-@dataclass
-class CommentsReplyPageDTO:
-    comments: list[CommentReplyDTO]
+    comments: list[CommentDTO]
     next_cursor: datetime | None
     has_next: bool
