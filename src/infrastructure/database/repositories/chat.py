@@ -69,7 +69,6 @@ class ChatRepository:
     ) -> list[ChatDTO]:
 
         current_participant = aliased(ChatParticipantModel)
-        other_participant = aliased(ChatParticipantModel)
 
         last_read_created_at = (
             select(MessageModel.created_at)

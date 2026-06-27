@@ -1,0 +1,2 @@
+class InvalidParticipantsCountException(Exception):
+    pass
