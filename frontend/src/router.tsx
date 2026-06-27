@@ -3,6 +3,7 @@ import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import ProfilePage from './pages/ProfilePage'
 import SearchPage from './pages/SearchPage'
+import ChatsPage from './pages/ChatsPage'
 import RootRedirect from './pages/Rootredirect'
 import SetupProfilePage from './pages/SetupProfilePage'
 import ProtectedRoute from './components/layout/ProtectedRoute'
@@ -27,6 +28,14 @@ export const router = createBrowserRouter([
       {
         path: 'search',
         element: <SearchPage />,
+      },
+      {
+        path: 'chats',
+        element: <ChatsPage />,
+      },
+      {
+        path: 'chats/:chatId',
+        element: <ChatsPage />,
       },
       {
         path: ':username',

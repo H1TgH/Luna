@@ -86,3 +86,7 @@ class ProfileModel(Base):
             postgresql_ops={"last_name": "gin_trgm_ops"}
         ),
     )
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
