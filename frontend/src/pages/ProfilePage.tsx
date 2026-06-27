@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { profileApi } from '../api/profile'
 import { postsApi } from '../api/posts'
+import { chatApi } from '../api/chat'
 import type { ImageItem } from '../api/posts'
 import type { ProfileResponse, PostResponse, PostImageResponse } from '../types'
 import { useMeStore } from '../store/meStore'
@@ -149,7 +150,6 @@ function ImageLightbox({ state, onClose, onNav }: {
               <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-
           <button
             onClick={(e) => { e.stopPropagation(); onNav(1) }}
             style={{
@@ -218,21 +218,12 @@ function ImageGrid({ images, onImageClick }: {
   }
 
   const imgStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    objectPosition: 'center',
-    display: 'block',
-    cursor: 'pointer',
-    transition: 'opacity 0.15s',
+    width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center',
+    display: 'block', cursor: 'pointer', transition: 'opacity 0.15s',
   }
 
   const cellStyle: React.CSSProperties = {
-    overflow: 'hidden',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 0,
+    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0,
   }
 
   if (count === 1) return (
@@ -245,9 +236,7 @@ function ImageGrid({ images, onImageClick }: {
 
   const cell = (src: string, idx: number, extra?: React.ReactNode): React.ReactElement => (
     <div key={idx} style={{ ...cellStyle, aspectRatio: '1/1', position: 'relative' }}>
-      <img src={src} alt=""
-        style={imgStyle}
-        onClick={() => onImageClick(idx)} {...hoverHandlers} />
+      <img src={src} alt="" style={imgStyle} onClick={() => onImageClick(idx)} {...hoverHandlers} />
       {extra}
     </div>
   )
@@ -261,9 +250,7 @@ function ImageGrid({ images, onImageClick }: {
   if (count === 3) return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden' }}>
       <div style={{ ...cellStyle, aspectRatio: '1/1', gridRow: '1 / 3', position: 'relative' }}>
-        <img src={getPostImageUrl(sorted[0].object_key)} alt=""
-          style={imgStyle}
-          onClick={() => onImageClick(0)} {...hoverHandlers} />
+        <img src={getPostImageUrl(sorted[0].object_key)} alt="" style={imgStyle} onClick={() => onImageClick(0)} {...hoverHandlers} />
       </div>
       {sorted.slice(1).map((img, i) => cell(getPostImageUrl(img.object_key), i + 1))}
     </div>
@@ -274,17 +261,14 @@ function ImageGrid({ images, onImageClick }: {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: '3px', borderRadius: '12px', overflow: 'hidden' }}>
       {shown.map((img, i) => cell(
-        getPostImageUrl(img.object_key),
-        i,
+        getPostImageUrl(img.object_key), i,
         i === 3 && extra > 0 ? (
           <div onClick={() => onImageClick(3)} style={{
             position: 'absolute', inset: 0, background: 'rgba(6,9,26,0.65)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', fontSize: '22px', fontWeight: 500, color: '#e8ecf8',
             fontFamily: "'Outfit', sans-serif",
-          }}>
-            +{extra}
-          </div>
+          }}>+{extra}</div>
         ) : undefined
       ))}
     </div>
@@ -303,7 +287,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
- 
+
   useEffect(() => {
     if (!menuOpen) return
     const handler = (e: MouseEvent) => {
@@ -312,7 +296,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [menuOpen])
- 
+
   return (
     <article style={{
       background: 'rgba(255,255,255,0.028)',
@@ -324,7 +308,6 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
         <span style={{ fontSize: '13px', color: 'rgba(107,114,156,0.65)', fontFamily: "'Outfit', sans-serif" }}>
           {formatDate(post.created_at)}
         </span>
- 
         {isOwn && (
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
@@ -343,7 +326,6 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
                 <circle cx="8" cy="12.5" r="1.2" fill="currentColor" />
               </svg>
             </button>
- 
             {menuOpen && (
               <div style={{
                 position: 'absolute', right: 0, top: '100%', marginTop: '4px',
@@ -357,8 +339,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
                     display: 'flex', alignItems: 'center', gap: '8px',
                     width: '100%', padding: '11px 14px', background: 'none', border: 'none',
                     cursor: 'pointer', color: '#f87171', fontSize: '13.5px',
-                    fontFamily: "'Outfit', sans-serif", textAlign: 'left',
-                    transition: 'background 0.15s',
+                    fontFamily: "'Outfit', sans-serif", textAlign: 'left', transition: 'background 0.15s',
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(248,113,113,0.08)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
@@ -374,7 +355,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
           </div>
         )}
       </div>
- 
+
       {post.content && (
         <p style={{
           fontSize: '15px', color: '#d4d8ef', lineHeight: 1.65,
@@ -384,15 +365,14 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
           {post.content}
         </p>
       )}
- 
+
       {post.images && post.images.length > 0 && (
         <ImageGrid images={post.images} onImageClick={(i) => onImageClick(post.images!, i)} />
       )}
- 
+
       <div style={{
         display: 'flex', alignItems: 'center', gap: '2px',
-        paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)',
-        marginTop: '2px',
+        paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '2px',
       }}>
         <button
           onClick={() => onLike(post.id, post.is_current_user_likes)}
@@ -402,8 +382,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
             cursor: myProfileId ? 'pointer' : 'default',
             padding: '7px 10px', borderRadius: '8px',
             color: post.is_current_user_likes ? '#f472b6' : 'rgba(107,114,156,0.55)',
-            fontSize: '13px', fontFamily: "'Outfit', sans-serif",
-            transition: 'color 0.2s, background 0.2s',
+            fontSize: '13px', fontFamily: "'Outfit', sans-serif", transition: 'color 0.2s, background 0.2s',
           }}
           onMouseEnter={(e) => {
             if (!myProfileId) return
@@ -422,7 +401,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
           </svg>
           {post.likes_count > 0 && <span>{post.likes_count}</span>}
         </button>
- 
+
         <button
           onClick={() => setIsCommentsOpen(p => !p)}
           style={{
@@ -431,8 +410,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
             border: 'none', cursor: 'pointer',
             padding: '7px 10px', borderRadius: '8px',
             color: isCommentsOpen ? '#a99ef0' : 'rgba(107,114,156,0.8)',
-            fontSize: '13px', fontFamily: "'Outfit', sans-serif",
-            transition: 'all 0.2s',
+            fontSize: '13px', fontFamily: "'Outfit', sans-serif", transition: 'all 0.2s',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = '#8b7fe8'; e.currentTarget.style.background = 'rgba(139,127,232,0.1)' }}
           onMouseLeave={(e) => {
@@ -447,13 +425,12 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
           </svg>
           {post.comments_count > 0 && <span>{post.comments_count}</span>}
         </button>
- 
+
         <button disabled title="Репосты — скоро" style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           background: 'none', border: 'none', cursor: 'default',
           padding: '7px 10px', borderRadius: '8px',
-          color: 'rgba(107,114,156,0.3)', fontSize: '13px',
-          fontFamily: "'Outfit', sans-serif",
+          color: 'rgba(107,114,156,0.3)', fontSize: '13px', fontFamily: "'Outfit', sans-serif",
         }}>
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
             <path d="M11.5 4.5H4a1 1 0 00-1 1V7M3.5 10.5H11a1 1 0 001-1V8"
@@ -463,7 +440,7 @@ function PostCard({ post, isOwn, myProfileId, onDelete, onLike, onImageClick, on
           </svg>
         </button>
       </div>
- 
+
       <CommentSection
         postId={post.id}
         isOpen={isCommentsOpen}
@@ -482,7 +459,6 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
   const [isLoading, setIsLoading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
   const MAX_IMAGES = 10
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -536,9 +512,7 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
     setIsLoading(true)
     try {
       const { data: created } = await postsApi.create({ content: content.trim() || undefined, images })
-      if (created && created.id) {
-        onCreated(created)
-      }
+      if (created && created.id) onCreated(created)
       reset()
     } catch {
     } finally {
@@ -573,7 +547,7 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
           {previews.map((url, i) => (
             <div key={i} style={{ position: 'relative', width: '76px', height: '76px' }}>
-              <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: "cover", objectPosition: "center", borderRadius: '8px', display: 'block' }} />
+              <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', borderRadius: '8px', display: 'block' }} />
               <button onClick={() => removeImage(i)} style={{
                 position: 'absolute', top: '-6px', right: '-6px',
                 background: 'rgba(15,19,45,0.92)', border: '1px solid rgba(255,255,255,0.12)',
@@ -638,7 +612,6 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
             >
               Отмена
             </button>
-
             <button
               onClick={handleSubmit}
               disabled={(!content.trim() && images.length === 0) || isLoading}
@@ -674,7 +647,6 @@ function CreatePost({ onCreated }: { onCreated: (post: PostResponse) => void }) 
   )
 }
 
-// ─── Онлайн-индикатор с тултипом ────────────────────────────────────────────
 function OnlineIndicator({ lastSeen }: { lastSeen: string }) {
   const online = isOnline(lastSeen)
   const [hovered, setHovered] = useState(false)
@@ -686,27 +658,19 @@ function OnlineIndicator({ lastSeen }: { lastSeen: string }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Точка */}
       <div style={{
         width: '14px', height: '14px', borderRadius: '50%',
         background: online ? '#22c55e' : 'rgba(107,114,156,0.5)',
-        border: '2.5px solid #06091a',
-        transition: 'background 0.3s',
+        border: '2.5px solid #06091a', transition: 'background 0.3s',
       }} />
-
-      {/* Тултип */}
       {hovered && (
         <div style={{
-          position: 'absolute', bottom: '20px', left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(12,16,40,0.97)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(12,16,40,0.97)', border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '8px', padding: '5px 10px',
           fontSize: '12px', color: online ? '#86efac' : 'rgba(107,114,156,0.8)',
-          fontFamily: "'Outfit', sans-serif",
-          whiteSpace: 'nowrap', pointerEvents: 'none',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          zIndex: 10,
+          fontFamily: "'Outfit', sans-serif", whiteSpace: 'nowrap', pointerEvents: 'none',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 10,
         }}>
           {label}
         </div>
@@ -740,6 +704,10 @@ export default function ProfilePage() {
   const [photosLoading, setPhotosLoading] = useState(false)
   const [photosCursor, setPhotosCursor] = useState<string | undefined>(undefined)
   const [photosHasNext, setPhotosHasNext] = useState(true)
+
+  // ── NEW: chat state ──
+  const [startingChat, setStartingChat] = useState(false)
+
   const photosSentinelRef = useRef<HTMLDivElement>(null)
   const photosLoadingRef = useRef(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
@@ -796,13 +764,8 @@ export default function ProfilePage() {
       const { data } = await postsApi.getUserImages(profileId, nextCursor)
       const items = Array.isArray(data) ? data : []
       setPhotos((p) => nextCursor ? [...p, ...items] : items)
-      if (items.length < 25) {
-        setPhotosHasNext(false)
-        setPhotosCursor(undefined)
-      } else {
-        setPhotosHasNext(true)
-        setPhotosCursor(items[items.length - 1]?.created_at)
-      }
+      if (items.length < 25) { setPhotosHasNext(false); setPhotosCursor(undefined) }
+      else { setPhotosHasNext(true); setPhotosCursor(items[items.length - 1]?.created_at) }
     } catch {
     } finally {
       setPhotosLoading(false)
@@ -815,18 +778,14 @@ export default function ProfilePage() {
   }, [viewedProfile, loadPosts])
 
   useEffect(() => {
-    if (viewedProfile && activeTab === 'photos' && photos.length === 0) {
-      loadPhotos(viewedProfile.id)
-    }
+    if (viewedProfile && activeTab === 'photos' && photos.length === 0) loadPhotos(viewedProfile.id)
   }, [viewedProfile, activeTab, loadPhotos])
 
   useEffect(() => {
     if (!sentinelRef.current || !viewedProfile) return
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNext && !loadingRef.current) {
-          loadPosts(viewedProfile.id, cursor)
-        }
+        if (entries[0].isIntersecting && hasNext && !loadingRef.current) loadPosts(viewedProfile.id, cursor)
       },
       { rootMargin: '200px' }
     )
@@ -838,9 +797,7 @@ export default function ProfilePage() {
     if (!photosSentinelRef.current || !viewedProfile || activeTab !== 'photos') return
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && photosHasNext && !photosLoadingRef.current) {
-          loadPhotos(viewedProfile.id, photosCursor)
-        }
+        if (entries[0].isIntersecting && photosHasNext && !photosLoadingRef.current) loadPhotos(viewedProfile.id, photosCursor)
       },
       { rootMargin: '200px' }
     )
@@ -869,14 +826,11 @@ export default function ProfilePage() {
     try {
       await postsApi.delete(postId)
       setPosts((prev) => prev.filter((p) => p.id !== postId))
-    } catch {
-    }
+    } catch { }
   }
 
   const handleCountChange = (postId: string, delta: number) => {
-    setPosts(prev => prev.map(p =>
-      p.id === postId ? { ...p, comments_count: p.comments_count + delta } : p
-    ))
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: p.comments_count + delta } : p))
   }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -892,6 +846,24 @@ export default function ProfilePage() {
     } finally {
       setAvatarUploading(false)
       if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
+
+  // ── NEW: start or open personal chat ──
+  const handleStartChat = async () => {
+    if (!viewedProfile || startingChat) return
+    setStartingChat(true)
+    try {
+      const { data } = await chatApi.createOrGet({
+        is_group: false,
+        name: null,
+        users_ids: [viewedProfile.id],
+      })
+      navigate(`/chats/${data.id}`)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setStartingChat(false)
     }
   }
 
@@ -926,10 +898,7 @@ export default function ProfilePage() {
         <p style={{ color: '#6b729c', fontSize: '16px', fontFamily: "'Outfit', sans-serif" }}>
           {profileError ?? 'Профиль не найден'}
         </p>
-        <button onClick={() => navigate(-1)} style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: '#8b7fe8', fontSize: '14px', fontFamily: "'Outfit', sans-serif",
-        }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b7fe8', fontSize: '14px', fontFamily: "'Outfit', sans-serif" }}>
           ← Назад
         </button>
       </div>
@@ -941,12 +910,13 @@ export default function ProfilePage() {
       <Header />
 
       <div style={{ maxWidth: '860px', margin: '0 auto', padding: '36px 32px 80px' }}>
+        {/* ── Profile header ── */}
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: '22px',
           marginBottom: '32px', paddingBottom: '28px',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
-          {/* Аватар с онлайн-индикатором */}
+          {/* Avatar */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <div
               onClick={() => isOwnProfile && avatarInputRef.current?.click()}
@@ -955,28 +925,22 @@ export default function ProfilePage() {
                 background: 'linear-gradient(135deg, rgba(139,127,232,0.28), rgba(99,80,220,0.12))',
                 border: '2px solid rgba(139,127,232,0.18)',
                 overflow: 'hidden', cursor: isOwnProfile ? 'pointer' : 'default',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
               }}
             >
               {viewedProfile.avatar_url ? (
-                <img src={viewedProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: "cover", objectPosition: "center" }} />
+                <img src={viewedProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
               ) : (
-                <span style={{
-                  fontSize: '30px', fontWeight: 500, color: 'rgba(139,127,232,0.65)',
-                  fontFamily: "'Outfit', sans-serif", userSelect: 'none',
-                }}>
+                <span style={{ fontSize: '30px', fontWeight: 500, color: 'rgba(139,127,232,0.65)', fontFamily: "'Outfit', sans-serif", userSelect: 'none' }}>
                   {viewedProfile.first_name[0]}
                 </span>
               )}
-
               {isOwnProfile && (
                 <div
                   style={{
                     position: 'absolute', inset: 0, background: 'rgba(6,9,26,0.55)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    opacity: avatarUploading ? 1 : 0, transition: 'opacity 0.2s',
-                    borderRadius: '50%',
+                    opacity: avatarUploading ? 1 : 0, transition: 'opacity 0.2s', borderRadius: '50%',
                   }}
                   onMouseEnter={(e) => { if (!avatarUploading) e.currentTarget.style.opacity = '1' }}
                   onMouseLeave={(e) => { if (!avatarUploading) e.currentTarget.style.opacity = '0' }}
@@ -996,7 +960,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Онлайн-индикатор — теперь реальный, с тултипом */}
             <OnlineIndicator lastSeen={viewedProfile.last_seen} />
 
             {isOwnProfile && (
@@ -1004,35 +967,24 @@ export default function ProfilePage() {
             )}
           </div>
 
+          {/* Info */}
           <div style={{ flex: 1, minWidth: 0, paddingTop: '4px' }}>
-            <h1 style={{
-              fontSize: '21px', fontWeight: 600, color: '#e8ecf8',
-              fontFamily: "'Outfit', sans-serif", margin: 0, lineHeight: 1.2,
-            }}>
+            <h1 style={{ fontSize: '21px', fontWeight: 600, color: '#e8ecf8', fontFamily: "'Outfit', sans-serif", margin: 0, lineHeight: 1.2 }}>
               {viewedProfile.first_name} {viewedProfile.last_name}
             </h1>
-            <p style={{
-              fontSize: '14px', color: 'rgba(107,114,156,0.7)',
-              fontFamily: "'Outfit', sans-serif", margin: '3px 0 0',
-            }}>
+            <p style={{ fontSize: '14px', color: 'rgba(107,114,156,0.7)', fontFamily: "'Outfit', sans-serif", margin: '3px 0 0' }}>
               @{viewedProfile.username}
             </p>
 
-            {/* Статус онлайн под именем (текстовый) */}
             <p style={{
               fontSize: '12.5px',
               color: isOnline(viewedProfile.last_seen) ? 'rgba(134,239,172,0.7)' : 'rgba(107,114,156,0.45)',
-              fontFamily: "'Outfit', sans-serif",
-              margin: '4px 0 0',
+              fontFamily: "'Outfit', sans-serif", margin: '4px 0 0',
               display: 'flex', alignItems: 'center', gap: '5px',
             }}>
               {isOnline(viewedProfile.last_seen) ? (
                 <>
-                  <span style={{
-                    display: 'inline-block', width: '6px', height: '6px',
-                    borderRadius: '50%', background: '#22c55e',
-                    boxShadow: '0 0 6px rgba(34,197,94,0.6)',
-                  }} />
+                  <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px rgba(34,197,94,0.6)' }} />
                   В сети
                 </>
               ) : (
@@ -1041,15 +993,12 @@ export default function ProfilePage() {
             </p>
 
             {viewedProfile.status && (
-              <p style={{
-                fontSize: '14px', color: '#9095b8', fontFamily: "'Outfit', sans-serif",
-                margin: '10px 0 0', fontWeight: 300, lineHeight: 1.55,
-              }}>
+              <p style={{ fontSize: '14px', color: '#9095b8', fontFamily: "'Outfit', sans-serif", margin: '10px 0 0', fontWeight: 300, lineHeight: 1.55 }}>
                 {viewedProfile.status}
               </p>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '14px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
               <div>
                 <span style={{ fontSize: '15px', fontWeight: 600, color: '#e8ecf8', fontFamily: "'Outfit', sans-serif" }}>
                   {posts.length}{hasNext ? '+' : ''}
@@ -1059,7 +1008,7 @@ export default function ProfilePage() {
                 </span>
               </div>
 
-              {isOwnProfile && (
+              {isOwnProfile ? (
                 <button
                   onClick={() => setEditOpen(true)}
                   style={{
@@ -1069,25 +1018,60 @@ export default function ProfilePage() {
                     color: '#6b729c', fontSize: '12.5px', fontFamily: "'Outfit', sans-serif",
                     transition: 'color 0.2s, border-color 0.2s',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#a99ef0'
-                    e.currentTarget.style.borderColor = 'rgba(139,127,232,0.35)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#6b729c'
-                    e.currentTarget.style.borderColor = 'rgba(139,147,210,0.18)'
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#a99ef0'; e.currentTarget.style.borderColor = 'rgba(139,127,232,0.35)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#6b729c'; e.currentTarget.style.borderColor = 'rgba(139,147,210,0.18)' }}
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M8.5 1.5l2 2L4 10H2v-2l6.5-6.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Редактировать
                 </button>
+              ) : (
+                /* ── Write message button ── */
+                <button
+                  onClick={handleStartChat}
+                  disabled={startingChat}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    background: 'linear-gradient(135deg, rgba(139,127,232,0.15), rgba(99,80,220,0.08))',
+                    border: '1px solid rgba(139,127,232,0.3)',
+                    borderRadius: '8px', padding: '6px 14px', cursor: startingChat ? 'default' : 'pointer',
+                    color: startingChat ? 'rgba(139,127,232,0.4)' : '#a99ef0',
+                    fontSize: '13px', fontFamily: "'Outfit', sans-serif",
+                    transition: 'all 0.2s',
+                    opacity: startingChat ? 0.7 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!startingChat) {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,127,232,0.22), rgba(99,80,220,0.12))'
+                      e.currentTarget.style.borderColor = 'rgba(139,127,232,0.5)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,127,232,0.15), rgba(99,80,220,0.08))'
+                    e.currentTarget.style.borderColor = 'rgba(139,127,232,0.3)'
+                  }}
+                >
+                  {startingChat ? (
+                    <svg style={{ animation: 'spin 0.8s linear infinite' }} width="13" height="13" viewBox="0 0 24 24" fill="none">
+                      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                      <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <path d="M1.5 2h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H7.5L5 12.5v-3H1.5a.5.5 0 01-.5-.5v-7a.5.5 0 01.5-.5z"
+                        stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                  Написать
+                </button>
               )}
             </div>
           </div>
         </div>
 
+        {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: '20px' }}>
           {(['posts', 'photos'] as const).map((tab) => (
             <button
@@ -1115,7 +1099,6 @@ export default function ProfilePage() {
                 <CreatePost onCreated={(post) => setPosts((p) => [post, ...p])} />
               </div>
             )}
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {posts.map((post) => (
                 <PostCard
@@ -1129,19 +1112,12 @@ export default function ProfilePage() {
                   onCountChange={handleCountChange}
                 />
               ))}
-
               {!postsLoading && posts.length === 0 && (
-                <div style={{
-                  textAlign: 'center', padding: '56px 0',
-                  color: 'rgba(107,114,156,0.4)', fontFamily: "'Outfit', sans-serif",
-                  fontSize: '15px', fontWeight: 300,
-                }}>
+                <div style={{ textAlign: 'center', padding: '56px 0', color: 'rgba(107,114,156,0.4)', fontFamily: "'Outfit', sans-serif", fontSize: '15px', fontWeight: 300 }}>
                   {isOwnProfile ? 'Поделитесь чем-нибудь первым ✨' : 'Пока нет постов'}
                 </div>
               )}
-
               <div ref={sentinelRef} style={{ height: '1px' }} />
-
               {postsLoading && (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
                   <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -1157,18 +1133,11 @@ export default function ProfilePage() {
         {activeTab === 'photos' && (
           <>
             {!photosLoading && photos.length === 0 ? (
-              <div style={{
-                textAlign: 'center', padding: '56px 0',
-                color: 'rgba(107,114,156,0.4)', fontFamily: "'Outfit', sans-serif",
-                fontSize: '15px', fontWeight: 300,
-              }}>
+              <div style={{ textAlign: 'center', padding: '56px 0', color: 'rgba(107,114,156,0.4)', fontFamily: "'Outfit', sans-serif", fontSize: '15px', fontWeight: 300 }}>
                 Нет фотографий
               </div>
             ) : (
-              <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '3px', borderRadius: '12px', overflow: 'hidden',
-              }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', borderRadius: '12px', overflow: 'hidden' }}>
                 {photos.map((img, i) => (
                   <div
                     key={img.object_key + i}
@@ -1176,14 +1145,8 @@ export default function ProfilePage() {
                     onClick={() => setLightbox({ urls: photos.map((p) => getPostImageUrl(p.object_key)), index: i })}
                   >
                     <img
-                      src={getPostImageUrl(img.object_key)}
-                      alt=""
-                      style={{
-                        position: 'absolute', inset: 0,
-                        width: '100%', height: '100%',
-                        objectFit: 'cover', objectPosition: 'center',
-                        transition: 'opacity 0.15s',
-                      }}
+                      src={getPostImageUrl(img.object_key)} alt=""
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', transition: 'opacity 0.15s' }}
                       onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
                       onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
                     />
@@ -1191,9 +1154,7 @@ export default function ProfilePage() {
                 ))}
               </div>
             )}
-
             <div ref={photosSentinelRef} style={{ height: '1px' }} />
-
             {photosLoading && (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
                 <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -1206,24 +1167,20 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {lightbox && (
-        <ImageLightbox state={lightbox} onClose={() => setLightbox(null)} onNav={navLightbox} />
-      )}
+      {lightbox && <ImageLightbox state={lightbox} onClose={() => setLightbox(null)} onNav={navLightbox} />}
 
       {editOpen && viewedProfile && (
         <EditProfileModal
           profile={viewedProfile}
           onClose={() => setEditOpen(false)}
-          onSaved={(updated) => {
-            setViewedProfile(updated)
-            setMyProfileInStore(updated)
-            setEditOpen(false)
-          }}
+          onSaved={(updated) => { setViewedProfile(updated); setMyProfileInStore(updated); setEditOpen(false) }}
         />
       )}
     </div>
   )
 }
+
+// ─── EditProfileModal (unchanged) ─────────────────────────────────────────────
 
 function EditProfileModal({ profile, onClose, onSaved }: {
   profile: ProfileResponse
@@ -1268,31 +1225,21 @@ function EditProfileModal({ profile, onClose, onSaved }: {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 500,
-        background: 'rgba(3,5,15,0.78)', backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'rgba(12,16,38,0.99)', border: '1px solid rgba(255,255,255,0.09)',
-          borderRadius: '18px', padding: '28px', width: '100%', maxWidth: '420px',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
-        }}
-      >
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 500,
+      background: 'rgba(3,5,15,0.78)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'rgba(12,16,38,0.99)', border: '1px solid rgba(255,255,255,0.09)',
+        borderRadius: '18px', padding: '28px', width: '100%', maxWidth: '420px',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#e8ecf8', fontFamily: "'Outfit', sans-serif" }}>
             Редактировать профиль
           </h2>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'rgba(107,114,156,0.55)', padding: '4px', display: 'flex', borderRadius: '6px',
-            transition: 'color 0.2s',
-          }}
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(107,114,156,0.55)', padding: '4px', display: 'flex', borderRadius: '6px', transition: 'color 0.2s' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = '#6b729c')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(107,114,156,0.55)')}
           >
@@ -1303,11 +1250,7 @@ function EditProfileModal({ profile, onClose, onSaved }: {
         </div>
 
         {error && (
-          <div style={{
-            marginBottom: '16px', padding: '11px 14px', borderRadius: '9px',
-            background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)',
-            color: '#f87171', fontSize: '13.5px', fontFamily: "'Outfit', sans-serif",
-          }}>
+          <div style={{ marginBottom: '16px', padding: '11px 14px', borderRadius: '9px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', color: '#f87171', fontSize: '13.5px', fontFamily: "'Outfit', sans-serif" }}>
             {error}
           </div>
         )}
@@ -1316,17 +1259,10 @@ function EditProfileModal({ profile, onClose, onSaved }: {
           <EditField label="Имя" value={firstName} onChange={setFirstName} />
           <EditField label="Фамилия" value={lastName} onChange={setLastName} />
           <EditField label="Дата рождения" value={birthDate} onChange={setBirthDate} type="date" />
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{
-              fontSize: '11.5px', fontWeight: 500, color: '#6b729c',
-              textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Outfit', sans-serif",
-            }}>
-              Пол
-            </label>
+            <label style={{ fontSize: '11.5px', fontWeight: 500, color: '#6b729c', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Outfit', sans-serif" }}>Пол</label>
             <EditSelectGender value={gender} onChange={setGender} />
           </div>
-
           <EditField label="Статус" value={status} onChange={setStatus} placeholder="Расскажите о себе..." />
         </div>
 
@@ -1334,27 +1270,21 @@ function EditProfileModal({ profile, onClose, onSaved }: {
           <button onClick={onClose} style={{
             background: 'none', border: '1px solid rgba(139,147,210,0.18)', borderRadius: '8px',
             padding: '8px 16px', cursor: 'pointer', color: '#6b729c',
-            fontSize: '13.5px', fontFamily: "'Outfit', sans-serif",
-            transition: 'color 0.2s, border-color 0.2s',
+            fontSize: '13.5px', fontFamily: "'Outfit', sans-serif", transition: 'color 0.2s, border-color 0.2s',
           }}
             onMouseEnter={(e) => { e.currentTarget.style.color = '#9095b8'; e.currentTarget.style.borderColor = 'rgba(139,147,210,0.3)' }}
             onMouseLeave={(e) => { e.currentTarget.style.color = '#6b729c'; e.currentTarget.style.borderColor = 'rgba(139,147,210,0.18)' }}
           >
             Отмена
           </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            style={{
-              background: canSave ? 'linear-gradient(135deg, #8b7fe8 0%, #7a6dd8 100%)' : 'rgba(139,127,232,0.13)',
-              border: 'none', borderRadius: '8px', padding: '8px 20px',
-              cursor: canSave ? 'pointer' : 'default',
-              color: canSave ? '#fff' : 'rgba(139,127,232,0.35)',
-              fontSize: '13.5px', fontFamily: "'Outfit', sans-serif", fontWeight: 500,
-              display: 'flex', alignItems: 'center', gap: '6px',
-              transition: 'all 0.2s',
-            }}
-          >
+          <button onClick={handleSave} disabled={!canSave} style={{
+            background: canSave ? 'linear-gradient(135deg, #8b7fe8 0%, #7a6dd8 100%)' : 'rgba(139,127,232,0.13)',
+            border: 'none', borderRadius: '8px', padding: '8px 20px',
+            cursor: canSave ? 'pointer' : 'default',
+            color: canSave ? '#fff' : 'rgba(139,127,232,0.35)',
+            fontSize: '13.5px', fontFamily: "'Outfit', sans-serif", fontWeight: 500,
+            display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s',
+          }}>
             {isLoading ? (
               <svg style={{ animation: 'spin 1s linear infinite' }} width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
@@ -1369,75 +1299,51 @@ function EditProfileModal({ profile, onClose, onSaved }: {
 }
 
 function EditField({ label, value, onChange, placeholder, type = 'text' }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  type?: string
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string
 }) {
   const [focused, setFocused] = useState(false)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-      <label style={{
-        fontSize: '11.5px', fontWeight: 500, color: '#6b729c',
-        textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Outfit', sans-serif",
-      }}>
+      <label style={{ fontSize: '11.5px', fontWeight: 500, color: '#6b729c', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Outfit', sans-serif" }}>
         {label}
       </label>
       <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         style={{
-          width: '100%', boxSizing: 'border-box',
-          height: '40px', borderRadius: '9px', padding: '0 13px',
+          width: '100%', boxSizing: 'border-box', height: '40px', borderRadius: '9px', padding: '0 13px',
           fontSize: '14px', fontFamily: "'Outfit', sans-serif",
           background: 'rgba(17,22,54,0.7)',
           border: `1px solid ${focused ? 'rgba(139,127,232,0.55)' : 'rgba(139,147,210,0.18)'}`,
           boxShadow: focused ? '0 0 0 3px rgba(139,127,232,0.1)' : 'none',
-          color: '#e8ecf8', outline: 'none',
-          transition: 'border-color 0.2s, box-shadow 0.2s',
+          color: '#e8ecf8', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
         }}
       />
     </div>
   )
 }
 
-function EditSelectGender({ value, onChange }: {
-  value: 'Male' | 'Female'
-  onChange: (v: 'Male' | 'Female') => void
-}) {
+function EditSelectGender({ value, onChange }: { value: 'Male' | 'Female'; onChange: (v: 'Male' | 'Female') => void }) {
   const [focused, setFocused] = useState(false)
   return (
     <div style={{ position: 'relative' }}>
       <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as 'Male' | 'Female')}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        value={value} onChange={(e) => onChange(e.target.value as 'Male' | 'Female')}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         style={{
-          width: '100%', boxSizing: 'border-box',
-          height: '40px', borderRadius: '9px', padding: '0 36px 0 13px',
+          width: '100%', boxSizing: 'border-box', height: '40px', borderRadius: '9px', padding: '0 36px 0 13px',
           fontSize: '14px', fontFamily: "'Outfit', sans-serif",
           appearance: 'none', WebkitAppearance: 'none',
           background: 'rgba(17,22,54,0.7)',
           border: `1px solid ${focused ? 'rgba(139,127,232,0.55)' : 'rgba(139,147,210,0.18)'}`,
           boxShadow: focused ? '0 0 0 3px rgba(139,127,232,0.1)' : 'none',
-          color: '#e8ecf8', outline: 'none', cursor: 'pointer',
-          transition: 'border-color 0.2s, box-shadow 0.2s',
+          color: '#e8ecf8', outline: 'none', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s',
         }}
       >
         <option value="Male" style={{ background: 'rgb(17,22,54)' }}>Мужской</option>
         <option value="Female" style={{ background: 'rgb(17,22,54)' }}>Женский</option>
       </select>
-      <div style={{
-        pointerEvents: 'none', position: 'absolute',
-        right: '13px', top: '50%', transform: 'translateY(-50%)',
-        color: 'rgba(107,114,156,0.5)',
-      }}>
+      <div style={{ pointerEvents: 'none', position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(107,114,156,0.5)' }}>
         <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
           <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -1445,13 +1351,3 @@ function EditSelectGender({ value, onChange }: {
     </div>
   )
 }
-
-// ---- В ProfilePage добавить handleCountChange и передать в PostCard ----
-// const handleCountChange = (postId: string, delta: number) => {
-//   setPosts(prev => prev.map(p =>
-//     p.id === postId ? { ...p, comments_count: p.comments_count + delta } : p
-//   ))
-// }
-//
-// В JSX PostCard добавить проп:
-// onCountChange={handleCountChange}

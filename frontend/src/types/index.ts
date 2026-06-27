@@ -71,3 +71,57 @@ export interface CommentsPageResponse {
   next_cursor: string | null
   has_next: boolean
 }
+
+export type MessageType = 'System' | 'User'
+
+export interface MessageSenderChatResponse {
+  sender_id: string | null
+  username: string
+  first_name: string
+  last_name: string
+  avatar_key: string | null
+}
+
+export interface ChatMessageResponse {
+  id: string
+  sender: MessageSenderChatResponse | null
+  content: string
+  type: MessageType
+  is_edited: boolean
+  is_deleted: boolean
+  created_at: string
+  edited_at: string | null
+}
+
+export interface ChatInfoResponse {
+  id: string
+  is_group: boolean
+  name: string | null
+  avatar_url: string | null
+  username?: string | null
+}
+
+export interface ChatResponse {
+  id: string
+  last_message: ChatMessageResponse | null
+  is_mark_unread: boolean
+  is_group: boolean
+  name: string | null
+  avatar_url: string | null
+  unread_count: number
+  created_at: string
+}
+
+export interface ChatPageResponse {
+  chats: ChatResponse[]
+  has_next: boolean
+  next_cursor: string | null
+}
+
+export interface MessageHistoryResponse {
+  chat: ChatInfoResponse
+  messages: ChatMessageResponse[]
+  last_read_message_id: string | null
+  has_next: boolean
+  next_cursor: string | null
+}

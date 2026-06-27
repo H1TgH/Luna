@@ -251,7 +251,7 @@ interface RootCommentItemProps {
 }
 
 function RootCommentItem({ comment, me, postId, onCountChange, onRootReplyCountChange }: RootCommentItemProps) {
-  const repliesCount = comment.replies_count ?? 0
+  const repliesCount = comment.reply_count ?? 0
   const [showReplies, setShowReplies] = useState(false)
   const [replyingToRoot, setReplyingToRoot] = useState(false)
 
@@ -387,7 +387,7 @@ export default function CommentSection({ postId, isOpen, onCountChange }: Commen
 
   const handleRootReplyCountChange = (commentId: string, delta: number) => {
     setComments(prev => prev.map(c =>
-      c.id === commentId ? { ...c, replies_count: (c.replies_count ?? 0) + delta } : c
+      c.id === commentId ? { ...c, replies_count: (c.reply_count ?? 0) + delta } : c
     ))
   }
 

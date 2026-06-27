@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useMeStore } from '../../store/meStore'
 import { useMe } from '../../hooks/useMe'
@@ -61,7 +61,6 @@ function SearchBar() {
   }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Enter without selection → go to full search page
     if (e.key === 'Enter') {
       e.preventDefault()
       if (activeIndex >= 0 && results[activeIndex]) {
@@ -234,7 +233,6 @@ function SearchBar() {
             ))
           )}
 
-          {/* Footer: link to full search */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={goToSearch}
@@ -242,7 +240,6 @@ function SearchBar() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
               width: '100%', padding: '10px 14px',
               background: 'transparent',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
               border: 'none',
               borderTopWidth: '1px',
               borderTopStyle: 'solid',
@@ -273,6 +270,7 @@ function SearchBar() {
 
 export default function Header() {
   const navigate = useNavigate()
+  const location = useLocation()
   const clearTokens = useAuthStore((s) => s.clearTokens)
   const clearMe = useMeStore((s) => s.clear)
   useMe()
@@ -283,6 +281,8 @@ export default function Header() {
     clearMe()
     navigate('/login')
   }
+
+  const isChatsActive = location.pathname.startsWith('/chats')
 
   return (
     <header style={{
@@ -319,7 +319,44 @@ export default function Header() {
 
         <SearchBar />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          {/* Chats button */}
+          <Link
+            to="/chats"
+            title="Сообщения"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '36px', height: '36px', borderRadius: '10px',
+              background: isChatsActive ? 'rgba(139,127,232,0.15)' : 'transparent',
+              border: `1px solid ${isChatsActive ? 'rgba(139,127,232,0.3)' : 'rgba(139,147,210,0.12)'}`,
+              color: isChatsActive ? '#a99ef0' : '#6b729c',
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (!isChatsActive) {
+                e.currentTarget.style.color = '#a99ef0'
+                e.currentTarget.style.borderColor = 'rgba(139,127,232,0.3)'
+                e.currentTarget.style.background = 'rgba(139,127,232,0.08)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isChatsActive) {
+                e.currentTarget.style.color = '#6b729c'
+                e.currentTarget.style.borderColor = 'rgba(139,147,210,0.12)'
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M2 2.5h12a.5.5 0 01.5.5v8a.5.5 0 01-.5.5H9l-3 3v-3H2a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z"
+                stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
+                fill={isChatsActive ? 'rgba(139,127,232,0.15)' : 'none'}
+              />
+            </svg>
+          </Link>
+
           {me && (
             <Link
               to={`/${me.username}`}
@@ -347,7 +384,7 @@ export default function Header() {
                   </span>
                 )}
               </div>
-              <span style={{ 
+              <span style={{
                 fontSize: '13.5px', color: '#9095b8', fontFamily: "'Outfit', sans-serif", fontWeight: 400,
                 maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
               }}>
