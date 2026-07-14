@@ -854,11 +854,7 @@ export default function ProfilePage() {
     if (!viewedProfile || startingChat) return
     setStartingChat(true)
     try {
-      const { data } = await chatApi.createOrGet({
-        is_group: false,
-        name: null,
-        users_ids: [viewedProfile.id],
-      })
+      const { data } = await chatApi.createPersonal(viewedProfile.id)
       navigate(`/chats/${data.id}`)
     } catch (e) {
       console.error(e)

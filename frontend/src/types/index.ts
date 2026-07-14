@@ -97,8 +97,12 @@ export interface ChatInfoResponse {
   id: string
   is_group: boolean
   name: string | null
+  participants_count: number | null
+  online_participants_count: number | null
+  username: string | null
   avatar_url: string | null
-  username?: string | null
+  is_online: boolean | null
+  last_seen: string | null
 }
 
 export interface ChatResponse {

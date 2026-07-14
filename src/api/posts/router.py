@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
 from api.posts.decorators import handle_post_exceptions
 from api.posts.schemas import (
@@ -27,7 +27,7 @@ posts_router = APIRouter(
 
 @posts_router.post(
     "/",
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
     response_model=PostReadSchema
 )
 @handle_post_exceptions
@@ -56,7 +56,7 @@ async def create_post(
 
 @posts_router.get(
     "/me",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=PostPageSchema
 )
 @handle_post_exceptions
@@ -78,7 +78,7 @@ async def get_current_user_posts(
 
 @posts_router.get(
     "/user/{profile_id}",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=PostPageSchema
 )
 @handle_post_exceptions
@@ -101,7 +101,7 @@ async def get_user_posts(
 
 @posts_router.get(
     "/images/{profile_id}",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=list[ImageSchema]
 )
 async def get_user_images(
@@ -120,7 +120,7 @@ async def get_user_images(
 
 @posts_router.get(
     "/{post_id}",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=PostReadSchema
 )
 @handle_post_exceptions
@@ -134,7 +134,7 @@ async def get_post(
 
 @posts_router.delete(
     "/{post_id}",
-    status_code=204
+    status_code=status.HTTP_204_NO_CONTENT
 )
 @handle_post_exceptions
 async def delete_post(
@@ -147,7 +147,7 @@ async def delete_post(
 
 @posts_router.post(
     "/{post_id}/like",
-    status_code=200
+    status_code=status.HTTP_200_OK
 )
 @handle_post_exceptions
 async def put_like(
@@ -160,7 +160,7 @@ async def put_like(
 
 @posts_router.delete(
     "/{post_id}/like",
-    status_code=200
+    status_code=status.HTTP_200_OK
 )
 @handle_post_exceptions
 async def remove_like(
@@ -173,7 +173,7 @@ async def remove_like(
 
 @posts_router.post(
     "/{post_id}/comments",
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
     response_model=CommentSchema
 )
 @handle_post_exceptions
@@ -194,7 +194,7 @@ async def create_comment(
 
 @posts_router.get(
     "/comments/{post_id}/root",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=CommentsPageSchema
 )
 @handle_post_exceptions
@@ -210,7 +210,7 @@ async def get_root_comments(
 
 @posts_router.get(
     "/comments/{comment_id}/thread",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=CommentsPageSchema
 )
 @handle_post_exceptions
@@ -226,7 +226,7 @@ async def get_comment_replies(
 
 @posts_router.delete(
     "/comments/{comment_id}",
-    status_code=204
+    status_code=status.HTTP_204_NO_CONTENT
 )
 @handle_post_exceptions
 async def delete_comment(

@@ -145,7 +145,13 @@ class PostService:
     def _resolve_image_urls(self, images: list[PostImageDTO] | None) -> list[PostImageDTO]:
         if not images:
             return []
-        return [PostImageDTO(object_key=self.s3.get_file_url(img.object_key), order=img.order) for img in images]
+        return [
+            PostImageDTO(
+                object_key=self.s3.get_file_url(img.object_key),
+                order=img.order
+            )
+            for img in images
+        ]
 
     async def _delete_post_images(self, images: list[PostImageDTO]) -> None:
         if not images:

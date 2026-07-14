@@ -45,8 +45,12 @@ class ChatInfoSchema(BaseModel):
     id: UUID
     is_group: bool
     name: str | None
+    participants_count: int | None
+    online_participants_count: int | None
     username: str | None
     avatar_url: str | None
+    is_online: bool | None
+    last_seen: datetime | None
 
 
 class MessageHistorySchema(BaseModel):
@@ -71,3 +75,11 @@ class ChatPageSchema(BaseModel):
 
 class MessageUpdateSchema(BaseModel):
     content: str
+
+
+class ChatInfoUpdateSchema(BaseModel):
+    name: str
+
+
+class ChatAvatarUpdateResponseSchema(BaseModel):
+    avatar_url: str

@@ -1,9 +1,24 @@
 import { api } from './client'
-import type { ChatPageResponse, MessageHistoryResponse, ChatMessageResponse } from '../types'
+import type { ChatPageResponse, MessageHistoryResponse, ChatMessageResponse, ProfileResponse } from '../types'
 
 export const chatApi = {
-  createOrGet: (data: { is_group: boolean; name: string | null; users_ids: string[] }) =>
-    api.post<{ id: string }>('/api/v1/chat/', data),
+  createPersonal: (userId: string) =>
+      api.post<{ id: string }>('/api/v1/chat/', (() => {
+        const f = new FormData()
+        f.append('is_group', 'false')
+        f.append('name', '')
+        f.append('user_ids', userId)
+        return f
+      })(), { headers: { 'Content-Type': 'multipart/form-data' } }),
+
+    createGroup: (name: string, userIds: string[], avatar?: File) => {
+      const f = new FormData()
+      f.append('is_group', 'true')
+      f.append('name', name)
+      userIds.forEach(id => f.append('user_ids', id))
+      if (avatar) f.append('chat_avatar', avatar)
+      return api.post<{ id: string }>('/api/v1/chat/', f, { headers: { 'Content-Type': 'multipart/form-data' } })
+    },
 
   getChats: (cursor?: string, limit = 20) =>
     api.get<ChatPageResponse>('/api/v1/chat/', {
@@ -29,4 +44,31 @@ export const chatApi = {
 
   markAsRead: (chatId: string, messageId: string) =>
     api.patch(`/api/v1/chat/${chatId}/${messageId}/read`),
+
+  getParticipants: (chatId: string, limit = 20, offset = 0) =>
+    api.get<ProfileResponse[]>(`/api/v1/user/profile/${chatId}/participants`, {
+      params: { limit, offset },
+    }),
+
+  searchParticipants: (chatId: string, query: string, limit = 20, offset = 0) =>
+    api.get<ProfileResponse[]>(`/api/v1/user/profile/${chatId}/participants/search`, {
+      params: { query, limit, offset },
+    }),
+
+  updateChatName: (chatId: string, name: string) =>
+    api.patch(`/api/v1/chat/${chatId}`, { name }),
+
+  updateChatAvatar: (chatId: string, avatar: File) => {
+    const f = new FormData()
+    f.append('avatar', avatar)
+    return api.patch<{ avatar_url: string }>(`/api/v1/chat/${chatId}/avatar`, f, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  inviteUser: (chatId: string, userId: string) =>
+    api.post(`/api/v1/chat/${chatId}/participants/${userId}`),
+
+  kickUser: (chatId: string, userId: string) =>
+    api.delete(`/api/v1/chat/${chatId}/participants/${userId}`),
 }

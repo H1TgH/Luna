@@ -1,10 +1,11 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
 from api.chat.schemas import (
-    ChatCreationSchema,
+    ChatAvatarUpdateResponseSchema,
+    ChatInfoUpdateSchema,
     ChatPageSchema,
     ChatSchema,
     MessageCreationSchema,
@@ -13,7 +14,7 @@ from api.chat.schemas import (
     MessageUpdateSchema,
 )
 from core.auth.entities import CurrentUserDTO
-from core.chat.entities import ChatCreationDTO, MessageCreationDTO
+from core.chat.entities import ChatCreationDTO, ChatUploadImageDTO, MessageCreationDTO
 from core.chat.enums import MessageTypeEnum
 from core.chat.services import ChatService, get_chat_service
 from dependencies import get_current_user
@@ -27,21 +28,33 @@ chat_router = APIRouter(
 
 @chat_router.post(
     "/",
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
     response_model=ChatSchema
 )
 async def create_chat(
-    data: ChatCreationSchema,
+    is_group: bool = Form(...),
+    name: str | None = Form(None),
+    user_ids: list[UUID] = Form(...),
+    chat_avatar: UploadFile | None = File(None),
     current_user: CurrentUserDTO = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service)
 ):
-    dto = ChatCreationDTO(**data.model_dump())
-    return await service.create_chat(dto, current_user.id)
+    dto = ChatCreationDTO(
+        is_group=is_group,
+        name=name,
+        users_ids=user_ids,
+        creator_id=current_user.id
+    )
+    avatar = None
+    if chat_avatar:
+        avatar = ChatUploadImageDTO(chat_avatar.filename, chat_avatar.file)
+
+    return await service.create_chat(dto, current_user.id, avatar)
 
 
 @chat_router.get(
     "/",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=ChatPageSchema
 )
 async def get_user_chats(
@@ -55,7 +68,7 @@ async def get_user_chats(
 
 @chat_router.post(
     "/message",
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
     response_model=MessageSchema
 )
 async def send_message(
@@ -74,7 +87,7 @@ async def send_message(
 
 @chat_router.patch(
     "/message/{message_id}",
-    status_code=204
+    status_code=status.HTTP_204_NO_CONTENT
 )
 async def edit_message(
     message_id: UUID,
@@ -87,7 +100,7 @@ async def edit_message(
 
 @chat_router.delete(
     "/message/{message_id}/me",
-    status_code=204
+    status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_message_for_me(
     message_id: UUID,
@@ -99,7 +112,7 @@ async def delete_message_for_me(
 
 @chat_router.delete(
     "/message/{message_id}/all",
-    status_code=204
+    status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_message_for_all(
     message_id: UUID,
@@ -111,7 +124,7 @@ async def delete_message_for_all(
 
 @chat_router.get(
     "/{chat_id}",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=MessageHistorySchema
 )
 async def get_chat_history(
@@ -125,8 +138,66 @@ async def get_chat_history(
 
 
 @chat_router.patch(
+    "/{chat_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def update_chat_name(
+    chat_id: UUID,
+    data: ChatInfoUpdateSchema,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service)
+):
+    await service.update_chat_name(chat_id, data.name)
+
+
+@chat_router.patch(
+    "/{chat_id}/avatar",
+    status_code=status.HTTP_200_OK,
+    response_model=ChatAvatarUpdateResponseSchema
+)
+async def update_chat_avatar(
+    chat_id: UUID,
+    avatar: UploadFile,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service)
+):
+    avatar_url = await service.update_chat_avatar(chat_id, ChatUploadImageDTO(avatar.filename, avatar.file))
+    return ChatAvatarUpdateResponseSchema(avatar_url=avatar_url)
+
+
+@chat_router.post(
+    "/{chat_id}/participants/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def invite_user_to_chat(
+    chat_id: UUID,
+    user_id: UUID,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service)
+):
+    await service.invite_user_to_chat(chat_id, user_id, current_user.id)
+
+
+@chat_router.delete(
+    "/{chat_id}/participants/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def kick_user_from_chat(
+    chat_id: UUID,
+    user_id: UUID,
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service)
+):
+    await service.kick_user_from_chat(
+        chat_id,
+        user_id,
+        current_user.id
+    )
+
+
+@chat_router.patch(
     "/{chat_id}/{message_id}/read",
-    status_code=204
+    status_code=status.HTTP_204_NO_CONTENT
 )
 async def mark_as_read(
     chat_id: UUID,

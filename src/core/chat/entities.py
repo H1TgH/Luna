@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import BinaryIO
 from uuid import UUID
 
 from core.chat.enums import MessageTypeEnum
@@ -59,8 +60,12 @@ class ChatInfoDTO:
     id: UUID
     is_group: bool
     name: str | None = None
+    participants_count: int | None = None
+    online_participants_count: int | None = None
     username: str | None = None
     avatar_url: str | None = None
+    is_online: bool | None = None
+    last_seen: datetime | None = None
 
 
 @dataclass
@@ -82,3 +87,9 @@ class ChatPageDTO:
 @dataclass
 class MessageUpdateDTO:
     content: str
+
+
+@dataclass
+class ChatUploadImageDTO:
+    file_name: str
+    data: BinaryIO
