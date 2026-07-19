@@ -2,6 +2,7 @@ from fastapi import APIRouter, FastAPI
 
 from api.auth.router import auth_router
 from api.chat.router import chat_router
+from api.chat.websocket import chat_ws_router
 from api.posts.router import posts_router
 from api.presense.router import presense_router
 from api.profile.router import profile_router
@@ -15,5 +16,6 @@ api_v1_router.include_router(profile_router)
 api_v1_router.include_router(posts_router)
 api_v1_router.include_router(presense_router)
 api_v1_router.include_router(chat_router)
+api_v1_router.include_router(chat_ws_router)
 
 app.include_router(api_v1_router)
