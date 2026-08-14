@@ -286,6 +286,24 @@ class ChatRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_peer_last_read_message_id(self, chat_id: UUID, current_user_id: UUID) -> UUID | None:
+        stmt = (
+            select(ChatParticipantModel.last_read_message_id)
+            .join(
+                MessageModel,
+                MessageModel.id == ChatParticipantModel.last_read_message_id
+            )
+            .where(
+                ChatParticipantModel.chat_id == chat_id,
+                ChatParticipantModel.user_id != current_user_id,
+                ChatParticipantModel.last_read_message_id.is_not(None)
+            )
+            .order_by(MessageModel.created_at.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def delete_user_from_chat(self, chat_id: UUID, user_id: UUID) -> None:
         stmt = (
             delete(ChatParticipantModel)

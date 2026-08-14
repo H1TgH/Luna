@@ -164,7 +164,8 @@ class ChatService:
                 chat_dto.is_online = await presense_repo.is_online(interlocutor.id)
                 chat_dto.last_seen = await presense_repo.get_last_seen(interlocutor.id)
 
-            last_read_message_id = await chat_repo.get_last_read_message_id(chat_id, current_user_id)
+            own_last_read_message_id = await chat_repo.get_last_read_message_id(chat_id, current_user_id)
+            peer_last_read_message_id = await chat_repo.get_peer_last_read_message_id(chat_id, current_user_id)
 
             messages = await chat_repo.get_chat_history(chat_id, limit + 1, cursor)
             has_next = len(messages) > limit
@@ -174,7 +175,9 @@ class ChatService:
             return MessageHistoryDTO(
                 chat=chat_dto,
                 messages=messages,
-                last_read_message_id=last_read_message_id,
+                last_read_message_id=own_last_read_message_id,
+                own_last_read_message_id=own_last_read_message_id,
+                peer_last_read_message_id=peer_last_read_message_id,
                 has_next=has_next,
                 next_cursor=next_cursor
             )
@@ -261,12 +264,15 @@ class ChatService:
     async def edit_message(self, message_id: UUID, current_user_id: UUID, data: MessageUpdateDTO) -> MessageDTO:
         async with self.uow() as session:
             repo = ChatRepository(session)
+            profile_repo = ProfileRepository(session)
 
             updated_message = await repo.update_message(message_id, current_user_id, data)
             if updated_message is None:
                 raise PermissionDeniedException("You can't edit this message")
 
-            return updated_message
+            sender = await profile_repo.get_by_user_id(current_user_id)
+            avatar_url = self._build_avatar_url(sender.avatar_key)
+            return self._build_message_dto(updated_message, sender, avatar_url)
 
     async def mark_as_read(
         self,

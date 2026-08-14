@@ -73,6 +73,8 @@ class MessageHistoryDTO:
     chat: ChatInfoDTO
     messages: list[MessageDTO]
     last_read_message_id: UUID | None
+    own_last_read_message_id: UUID | None
+    peer_last_read_message_id: UUID | None
     has_next: bool
     next_cursor: datetime | None
 

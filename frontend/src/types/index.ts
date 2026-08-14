@@ -126,6 +126,8 @@ export interface MessageHistoryResponse {
   chat: ChatInfoResponse
   messages: ChatMessageResponse[]
   last_read_message_id: string | null
+  own_last_read_message_id?: string | null
+  peer_last_read_message_id?: string | null
   has_next: boolean
   next_cursor: string | null
 }

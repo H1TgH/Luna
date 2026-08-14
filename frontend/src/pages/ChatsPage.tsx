@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useMeStore } from '../store/meStore'
 import { useMe } from '../hooks/useMe'
+import { useChatSocket } from '../hooks/useChatSocket'
 import Header from '../components/layout/Header'
 import { chatApi } from '../api/chat'
 import type { ChatMessageResponse, ChatResponse } from '../types'
@@ -44,6 +45,11 @@ function formatDateSep(iso: string) {
 
 function sameDay(a: string, b: string) {
   return new Date(a).toDateString() === new Date(b).toDateString()
+}
+
+function isAtBottom(el: HTMLDivElement | null, gap = 80) {
+  if (!el) return true
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= gap
 }
 
 function isSystem(msg: ChatMessageResponse) {
@@ -130,20 +136,19 @@ function DateSeparator({ date }: { date: string }) {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, isOwn, showAvatar, isGroup, isRead, onEdited, onDeleteForMe, onDeleteForAll }: {
+function MessageBubble({ msg, isOwn, showAvatar, isGroup, isRead, onEdit, onDeleteForMe, onDeleteForAll }: {
   msg: ChatMessageResponse
   isOwn: boolean
   showAvatar: boolean
   isGroup: boolean
   isRead: boolean
-  onEdited: (u: ChatMessageResponse) => void
+  onEdit: (id: string, content: string) => void
   onDeleteForMe: (id: string) => void
   onDeleteForAll: (id: string) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content)
-  const [saving, setSaving] = useState(false)
   const [showDel, setShowDel] = useState(false)
   const delRef = useRef<HTMLDivElement>(null)
 
@@ -156,14 +161,14 @@ function MessageBubble({ msg, isOwn, showAvatar, isGroup, isRead, onEdited, onDe
     return () => document.removeEventListener('mousedown', h)
   }, [showDel])
 
-  const saveEdit = async () => {
-    if (!editText.trim() || saving) return
-    setSaving(true)
-    try {
-      await chatApi.editMessage(msg.id, editText.trim())
-      onEdited({ ...msg, content: editText.trim(), is_edited: true })
-      setEditing(false)
-    } catch { } finally { setSaving(false) }
+  useEffect(() => {
+    if (!editing) setEditText(msg.content)
+  }, [msg.content, editing])
+
+  const saveEdit = () => {
+    if (!editText.trim()) return
+    onEdit(msg.id, editText.trim())
+    setEditing(false)
   }
 
   const senderName = msg.sender
@@ -221,9 +226,9 @@ function MessageBubble({ msg, isOwn, showAvatar, isGroup, isRead, onEdited, onDe
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.6)', fontSize: '13px', fontFamily: "'Outfit', sans-serif", padding: '4px 8px' }}>
                     Отмена
                   </button>
-                  <button onClick={saveEdit} disabled={saving || !editText.trim()}
+                  <button onClick={saveEdit} disabled={!editText.trim()}
                     style={{ background: 'rgba(139,127,232,0.2)', border: '1px solid rgba(139,127,232,0.35)', borderRadius: '7px', padding: '4px 12px', cursor: 'pointer', color: '#a99ef0', fontSize: '13px', fontFamily: "'Outfit', sans-serif" }}>
-                    {saving ? '...' : 'Сохранить'}
+                    Сохранить
                   </button>
                 </div>
               </div>
@@ -303,6 +308,32 @@ function DelBtn({ label, onClick, danger }: { label: string; onClick: () => void
       }}>
       {label}
     </button>
+  )
+}
+
+function TypingIndicator() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+      <style>{`
+        @keyframes lunaTypingDot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+          30% { transform: translateY(-3px); opacity: 1; }
+        }
+      `}</style>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', height: 14 }}>
+        {[0, 1, 2].map(i => (
+          <span key={i} style={{
+            width: 4, height: 4, borderRadius: '50%',
+            background: 'rgba(169,158,240,0.95)',
+            animation: 'lunaTypingDot 1.2s ease-in-out infinite',
+            animationDelay: `${i * 0.18}s`,
+          }} />
+        ))}
+      </span>
+      <span style={{ fontSize: '12px', color: 'rgba(169,158,240,0.85)', fontFamily: "'Outfit', sans-serif" }}>
+        Печатает
+      </span>
+    </div>
   )
 }
 
@@ -444,20 +475,94 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
       online_participants_count?: number | null
     } | null>(null)
   const [showGroupInfo, setShowGroupInfo] = useState(false)
-  const [lastReadMsgId, setLastReadMsgId] = useState<string | null>(null)
+  const [ownLastReadMsgId, setOwnLastReadMsgId] = useState<string | null>(null)
+  const [peerLastReadMsgId, setPeerLastReadMsgId] = useState<string | null>(null)
+  const [typing, setTyping] = useState(false)
+  const [newBelowCount, setNewBelowCount] = useState(0)
 
   const endRef = useRef<HTMLDivElement>(null)
   const topRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const moreRef = useRef(false)
   const firstLoad = useRef(true)
   const lastMarkedRef = useRef<string | null>(null)
   const initLoadDoneRef = useRef(false)
   const unreadDividerRef = useRef<HTMLDivElement>(null)
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTypingSent = useRef(0)
+  const wsSendRef = useRef<(payload: Record<string, unknown>) => boolean>(() => false)
 
   const headerName = chatInfo?.name ?? chat.name ?? 'Чат'
   const headerAvatar = chatInfo?.avatar_url ?? chat.avatar_url
   const isGroup = chatInfo?.is_group ?? chat.is_group
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    endRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+    setNewBelowCount(0)
+  }, [])
+
+  const getMessageIndex = useCallback((messageId: string | null) => {
+    if (!messageId) return -1
+    return messages.findIndex(m => m.id === messageId)
+  }, [messages])
+
+  const isOwnMessageRead = useCallback((messageId: string) => {
+    const peerIndex = getMessageIndex(peerLastReadMsgId)
+    const msgIndex = getMessageIndex(messageId)
+    return peerIndex !== -1 && msgIndex !== -1 && msgIndex <= peerIndex
+  }, [getMessageIndex, peerLastReadMsgId])
+
+  const getLatestIncomingMessageId = useCallback(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (!isSystem(msg) && msg.sender?.sender_id !== myId) return msg.id
+    }
+    return null
+  }, [messages, myId])
+
+  const { send: wsSend } = useChatSocket(chatId, {
+    onMessageCreated: (msg) => {
+      const nearBottom = isAtBottom(scrollRef.current)
+      setMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev
+        return [...prev, msg]
+      })
+      if (msg.sender?.sender_id !== myId) {
+        setTyping(false)
+        if (typingTimer.current) clearTimeout(typingTimer.current)
+        if (nearBottom) setTimeout(() => scrollToBottom(), 50)
+        else setNewBelowCount(prev => prev + 1)
+      } else {
+        setTimeout(() => scrollToBottom(), 50)
+      }
+    },
+    onMessageUpdated: (msg) => {
+      setMessages(prev => prev.map(m => m.id === msg.id ? msg : m))
+    },
+    onMessageDeleted: (messageId) => {
+      setMessages(prev => prev.filter(m => m.id !== messageId))
+    },
+    onMessageRead: (messageId, readerId) => {
+      if (readerId && String(readerId) === String(myId)) {
+        setOwnLastReadMsgId(messageId)
+        return
+      }
+      if (readerId && String(readerId) !== String(myId)) {
+        setPeerLastReadMsgId(messageId)
+      }
+    },
+    onUserTyping: (userId) => {
+      if (String(userId) === String(myId)) return
+      setTyping(true)
+      if (typingTimer.current) clearTimeout(typingTimer.current)
+      typingTimer.current = setTimeout(() => setTyping(false), 5500)
+    },
+    onChatRenamed: (name) => {
+      setChatInfo(prev => prev ? { ...prev, name } : prev)
+    },
+  })
+  wsSendRef.current = wsSend
 
   const load = useCallback(async (append = false, cur?: string | null) => {
     if (append && moreRef.current) return
@@ -472,17 +577,15 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
         username: data.chat.username ?? null,
         is_online: data.chat.is_online ?? null,
         last_seen: data.chat.last_seen ?? null,
+        participants_count: data.chat.participants_count ?? null,
+        online_participants_count: data.chat.online_participants_count ?? null,
       })
-      setLastReadMsgId((data as any).last_read_message_id ?? null)
+      setOwnLastReadMsgId(data.own_last_read_message_id ?? data.last_read_message_id ?? null)
+      setPeerLastReadMsgId(data.peer_last_read_message_id ?? null)
       const rev = [...data.messages].reverse()
       setMessages(prev => append ? [...rev, ...prev] : rev)
       setHasMore(data.has_next)
       setCursor(data.next_cursor ?? null)
-      const newestId = data.messages[0]?.id
-      if (newestId && newestId !== lastMarkedRef.current) {
-        lastMarkedRef.current = newestId
-        chatApi.markAsRead(chatId, newestId).catch(() => {})
-      }
     } catch (e) { console.error(e) }
     finally {
       if (append) { moreRef.current = false; setLoadingMore(false) }
@@ -495,48 +598,39 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
     initLoadDoneRef.current = true
     firstLoad.current = true
     lastMarkedRef.current = null
-    setMessages([]); setHasMore(false); setCursor(null); setChatInfo(null); setLastReadMsgId(null)
+    setMessages([]); setHasMore(false); setCursor(null); setChatInfo(null); setOwnLastReadMsgId(null); setPeerLastReadMsgId(null); setNewBelowCount(0)
     load(false, null)
   }, [chatId, load])
 
   useEffect(() => {
     if (!loading && firstLoad.current) {
       firstLoad.current = false
-      // Если есть непрочитанные — скроллим к разделителю, иначе вниз
       setTimeout(() => {
         if (unreadDividerRef.current) {
           unreadDividerRef.current.scrollIntoView({ block: 'center' })
         } else {
-          endRef.current?.scrollIntoView()
+          scrollToBottom(false)
         }
       }, 50)
     }
-  }, [loading])
+  }, [loading, scrollToBottom])
 
-  // Polling
   useEffect(() => {
-    const poll = async () => {
-      if (document.hidden) return
-      try {
-        const { data } = await chatApi.getHistory(chatId, undefined, 30)
-        const inc = [...data.messages].reverse()
-        setMessages(prev => {
-          const ids = new Set(prev.map(m => m.id))
-          const fresh = inc.filter(m => !ids.has(m.id))
-          if (!fresh.length) return prev
-          setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-          return [...prev, ...fresh]
-        })
-        const newestId = data.messages[0]?.id
-        if (newestId && newestId !== lastMarkedRef.current) {
-          lastMarkedRef.current = newestId
-          chatApi.markAsRead(chatId, newestId).catch(() => {})
-        }
-      } catch { }
+    const onScroll = () => {
+      if (!isAtBottom(scrollRef.current)) return
+      const latestIncomingId = getLatestIncomingMessageId()
+      if (!latestIncomingId || latestIncomingId === ownLastReadMsgId || latestIncomingId === lastMarkedRef.current) return
+      lastMarkedRef.current = latestIncomingId
+      wsSendRef.current({ event_type: 'message_read', message_id: latestIncomingId })
+      setOwnLastReadMsgId(latestIncomingId)
     }
-    const t = setInterval(poll, 4000)
-    return () => clearInterval(t)
-  }, [chatId])
+
+    const el = scrollRef.current
+    if (!el) return
+    onScroll()
+    el.addEventListener('scroll', onScroll)
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [getLatestIncomingMessageId, ownLastReadMsgId])
 
   // Infinite scroll up
   useEffect(() => {
@@ -549,18 +643,15 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
     return () => obs.disconnect()
   }, [hasMore, cursor, load])
 
-  const send = async () => {
+  const send = () => {
     const c = text.trim()
     if (!c || sending) return
     setSending(true)
     setText('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    try {
-      const { data } = await chatApi.sendMessage(chatId, c)
-      setMessages(prev => [...prev, data])
-      setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 30)
-    } catch { setText(c) }
-    finally { setSending(false) }
+    const ok = wsSend({ event_type: 'new_message', content: c })
+    if (!ok) setText(c)
+    setSending(false)
   }
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -573,17 +664,24 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
     e.target.style.height = 'auto'
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
     window.scrollTo({ top: sy })
+    const now = Date.now()
+    if (now - lastTypingSent.current > 3000) {
+      lastTypingSent.current = now
+      wsSend({ event_type: 'typing' })
+    }
   }
 
-  const onEdited = (u: ChatMessageResponse) =>
-    setMessages(prev => prev.map(m => m.id === u.id ? u : m))
-
-  const delForMe = async (id: string) => {
-    try { await chatApi.deleteForMe(id); setMessages(prev => prev.filter(m => m.id !== id)) } catch { }
+  const editMsg = (id: string, content: string) => {
+    wsSend({ event_type: 'edit_message', message_id: id, content })
   }
 
-  const delForAll = async (id: string) => {
-    try { await chatApi.deleteForAll(id); setMessages(prev => prev.filter(m => m.id !== id)) } catch { }
+  const delForMe = (id: string) => {
+    wsSend({ event_type: 'delete_for_me', message_id: id })
+    setMessages(prev => prev.filter(m => m.id !== id))
+  }
+
+  const delForAll = (id: string) => {
+    wsSend({ event_type: 'delete_for_all', message_id: id })
   }
 
   const rendered = () => {
@@ -604,9 +702,9 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
         !unreadInserted &&
         !isSystem(msg) &&
         msg.sender?.sender_id !== myId &&
-        lastReadMsgId &&
+        ownLastReadMsgId &&
         prev &&
-        prev.id === lastReadMsgId
+        prev.id === ownLastReadMsgId
       ) {
         unreadInserted = true
         items.push(
@@ -627,7 +725,7 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
       }
 
       // Если lastReadMsgId нет совсем — значит все сообщения новые, вставляем в начало
-      if (!unreadInserted && !lastReadMsgId && !isSystem(msg) && msg.sender?.sender_id !== myId && i === 0) {
+      if (!unreadInserted && !ownLastReadMsgId && !isSystem(msg) && msg.sender?.sender_id !== myId && i === 0) {
         unreadInserted = true
         items.push(
           <div key="unread-divider" ref={unreadDividerRef}
@@ -653,11 +751,11 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
       const own = msg.sender?.sender_id === myId
       const next = visible[i + 1]
       const showAv = !next || isSystem(next) || next.sender?.sender_id !== msg.sender?.sender_id || !sameDay(msg.created_at, next.created_at)
-      const isRead = !chat.is_mark_unread
+      const isRead = own ? isOwnMessageRead(msg.id) : false
 
       items.push(
         <MessageBubble key={msg.id} msg={msg} isOwn={own} showAvatar={showAv} isGroup={isGroup}
-          isRead={isRead} onEdited={onEdited} onDeleteForMe={delForMe} onDeleteForAll={delForAll} />
+          isRead={isRead} onEdit={editMsg} onDeleteForMe={delForMe} onDeleteForAll={delForAll} />
       )
     })
     return items
@@ -689,7 +787,7 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
               <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f0f2ff', fontFamily: "'Outfit', sans-serif" }}>
                 {headerName}
               </p>
-              <OnlineStatus isOnline={chatInfo.is_online} lastSeen={chatInfo.last_seen} />
+              {typing ? <TypingIndicator /> : <OnlineStatus isOnline={chatInfo.is_online} lastSeen={chatInfo.last_seen} />}
             </div>
           </Link>
         ) : (
@@ -710,12 +808,14 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
                   <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f0f2ff', fontFamily: "'Outfit', sans-serif" }}>
                     {headerName}
                   </p>
-                  <p style={{ margin: 0, fontSize: '12px', color: 'rgba(144,149,184,0.5)', fontFamily: "'Outfit', sans-serif" }}>
-                    {chatInfo?.participants_count != null
-                      ? `${chatInfo.participants_count} участн.${chatInfo.online_participants_count ? `, ${chatInfo.online_participants_count} онлайн` : ''}`
-                      : 'Беседа'
-                    }
-                  </p>
+                  {typing ? <TypingIndicator /> : (
+                    <p style={{ margin: 0, fontSize: '12px', color: 'rgba(144,149,184,0.5)', fontFamily: "'Outfit', sans-serif" }}>
+                      {chatInfo?.participants_count != null
+                        ? `${chatInfo.participants_count} участн.${chatInfo.online_participants_count ? `, ${chatInfo.online_participants_count} онлайн` : ''}`
+                        : 'Беседа'
+                      }
+                    </p>
+                  )}
                 </div>
               </button>
             ) : (
@@ -725,7 +825,7 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
                   <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f0f2ff', fontFamily: "'Outfit', sans-serif" }}>
                     {headerName}
                   </p>
-                  <OnlineStatus isOnline={chatInfo?.is_online} lastSeen={chatInfo?.last_seen} />
+                  {typing ? <TypingIndicator /> : <OnlineStatus isOnline={chatInfo?.is_online} lastSeen={chatInfo?.last_seen} />}
                 </div>
               </>
             )}
@@ -734,7 +834,13 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column' }}>
+      <div
+        ref={scrollRef}
+        onScroll={() => {
+          if (isAtBottom(scrollRef.current)) setNewBelowCount(0)
+        }}
+        style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', position: 'relative' }}
+      >
         <div ref={topRef} style={{ height: '1px' }} />
         {loadingMore && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '8px' }}>
@@ -757,6 +863,61 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
           </div>
         )}
         <div ref={endRef} style={{ height: '4px' }} />
+        {typing && (
+          <div style={{
+            alignSelf: 'flex-start', marginTop: 8, marginBottom: 4,
+            background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '4px 16px 16px 16px', padding: '8px 14px',
+          }}>
+            <TypingIndicator />
+          </div>
+        )}
+        <button
+          onClick={() => scrollToBottom()}
+          style={{
+            position: 'sticky',
+            alignSelf: 'flex-end',
+            bottom: 12,
+            marginTop: 'auto',
+            width: 42,
+            height: 42,
+            borderRadius: '50%',
+            border: '1px solid rgba(139,127,232,0.26)',
+            background: 'rgba(10,14,36,0.92)',
+            color: '#a99ef0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 10px 24px rgba(0,0,0,0.35)',
+            zIndex: 2,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {newBelowCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              minWidth: 18,
+              height: 18,
+              padding: '0 5px',
+              borderRadius: 9,
+              background: '#8b7fe8',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily: "'Outfit', sans-serif",
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {newBelowCount > 99 ? '99+' : newBelowCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Input */}

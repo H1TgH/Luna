@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { chatApi } from '../../api/chat'
+import { searchApi } from '../../api/search'
 import type { ProfileResponse } from '../../types'
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -109,6 +110,46 @@ function ParticipantRow({ profile, onKick }: { profile: ProfileResponse; onKick:
   )
 }
 
+function InviteRow({ profile, inviting, onInvite }: {
+  profile: ProfileResponse; inviting: boolean; onInvite: () => void
+}) {
+  const [hov, setHov] = useState(false)
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '11px',
+        padding: '9px 16px', borderRadius: '10px',
+        background: hov ? 'rgba(255,255,255,0.035)' : 'transparent',
+        transition: 'background 0.14s',
+      }}
+    >
+      <Avatar src={avatarUrl(profile.avatar_url)} name={profile.first_name} size={38} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: '14.5px', fontWeight: 500, color: '#d0d4f0', fontFamily: "'Outfit', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {profile.first_name} {profile.last_name}
+        </p>
+        <p style={{ margin: 0, fontSize: '12.5px', color: 'rgba(144,149,184,0.5)', fontFamily: "'Outfit', sans-serif" }}>
+          @{profile.username}
+        </p>
+      </div>
+      <button
+        onClick={onInvite}
+        disabled={inviting}
+        style={{
+          background: 'rgba(139,127,232,0.15)', border: '1px solid rgba(139,127,232,0.3)',
+          borderRadius: '8px', padding: '5px 12px', cursor: inviting ? 'default' : 'pointer',
+          color: '#a99ef0', fontSize: '12.5px', fontFamily: "'Outfit', sans-serif", flexShrink: 0,
+          opacity: inviting ? 0.5 : 1,
+        }}
+      >
+        {inviting ? '...' : 'Добавить'}
+      </button>
+    </div>
+  )
+}
+
 // ─── GroupChatInfoModal ───────────────────────────────────────────────────────
 
 export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, participantsCount, onClose, onChatUpdated }: {
@@ -126,8 +167,14 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
   const [newName, setNewName] = useState(chatName)
   const [savingName, setSavingName] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [inviteQuery, setInviteQuery] = useState('')
+  const [inviteResults, setInviteResults] = useState<ProfileResponse[]>([])
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [invitingId, setInvitingId] = useState<string | null>(null)
   const avatarFileRef = useRef<HTMLInputElement>(null)
   const debouncedQuery = useDebounce(query, 280)
+  const debouncedInvite = useDebounce(inviteQuery, 280)
 
   useEffect(() => {
     chatApi.getParticipants(chatId)
@@ -151,6 +198,26 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [debouncedQuery, chatId])
+
+  useEffect(() => {
+    if (!adding) return
+    setInviteLoading(true)
+    const q = debouncedInvite.trim()
+    const req = q
+      ? Promise.all([
+          searchApi.interlocutors(q, 15).then(r => r.data),
+          searchApi.profiles(q, 15).then(r => r.data),
+        ]).then(([a, b]) => {
+          const ids = new Set(a.map(p => p.id))
+          return [...a, ...b.filter(p => !ids.has(p.id))]
+        })
+      : searchApi.interlocutors('', 30).then(r => r.data)
+
+    req.then(list => {
+      const inChat = new Set(participants.map(p => p.id))
+      setInviteResults(list.filter(p => !inChat.has(p.id)))
+    }).catch(() => setInviteResults([])).finally(() => setInviteLoading(false))
+  }, [adding, debouncedInvite, participants])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -185,6 +252,16 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
     } catch { }
   }
 
+  const handleInvite = async (profile: ProfileResponse) => {
+    if (invitingId) return
+    setInvitingId(profile.id)
+    try {
+      await chatApi.inviteUser(chatId, profile.id)
+      setParticipants(prev => [...prev, profile])
+      setInviteResults(prev => prev.filter(p => p.id !== profile.id))
+    } catch { } finally { setInvitingId(null) }
+  }
+
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 600,
@@ -197,12 +274,11 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
         maxHeight: '80vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
       }}>
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 0', flexShrink: 0 }}>
           <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: '#f0f2ff', fontFamily: "'Outfit', sans-serif" }}>
-            Беседа
+            {adding ? 'Добавить участника' : 'Беседа'}
           </h2>
-          <button onClick={onClose}
+          <button onClick={adding ? () => { setAdding(false); setInviteQuery(''); setInviteResults([]) } : onClose}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.5)', padding: '4px', display: 'flex', borderRadius: '6px' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#9095b8')}
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(144,149,184,0.5)')}
@@ -213,119 +289,146 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
           </button>
         </div>
 
-        {/* Chat info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 24px', flexShrink: 0 }}>
-          <div
-            onClick={() => !uploadingAvatar && avatarFileRef.current?.click()}
-            style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}
-          >
-            <Avatar src={avatarUrl(chatAvatar)} name={chatName} size={52} />
-            <div style={{
-              position: 'absolute', inset: 0, borderRadius: '50%',
-              background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: 0, transition: 'opacity 0.2s',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
-            >
-              {uploadingAvatar
-                ? <Spinner size={16} />
-                : <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
-                    <path d="M9 2v9M5.5 5.5L9 2l3.5 3.5" stroke="#e8ecf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M3 13v2a.5.5 0 00.5.5h11a.5.5 0 00.5-.5v-2" stroke="#e8ecf8" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
+        {adding ? (
+          <>
+            <div style={{ padding: '16px 24px 10px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,147,210,0.14)', borderRadius: '10px', padding: '0 12px', height: '36px' }}>
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ color: 'rgba(144,149,184,0.4)', flexShrink: 0 }}>
+                  <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                <input value={inviteQuery} onChange={e => setInviteQuery(e.target.value)} placeholder="Поиск людей..."
+                  autoFocus
+                  style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: '#e0e4f8', fontSize: '13.5px', fontFamily: "'Outfit', sans-serif" }} />
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px' }}>
+              {inviteLoading
+                ? <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}><Spinner size={20} /></div>
+                : inviteResults.length === 0
+                  ? <p style={{ textAlign: 'center', padding: '24px', color: 'rgba(144,149,184,0.35)', fontSize: '14px', fontFamily: "'Outfit', sans-serif", margin: 0 }}>Никого не найдено</p>
+                  : inviteResults.map(p => (
+                    <InviteRow key={p.id} profile={p} inviting={invitingId === p.id} onInvite={() => handleInvite(p)} />
+                  ))
               }
             </div>
-            <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
-          </div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {editingName ? (
-              <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
-                <input
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleSaveName()
-                    if (e.key === 'Escape') { setEditingName(false); setNewName(chatName) }
-                  }}
-                  autoFocus
-                  style={{
-                    flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(139,127,232,0.4)',
-                    borderRadius: '8px', padding: '5px 10px', color: '#f0f2ff',
-                    fontSize: '16px', fontFamily: "'Outfit', sans-serif", fontWeight: 600, outline: 'none',
-                  }}
-                />
-                <button onClick={handleSaveName} disabled={savingName}
-                  style={{ background: 'rgba(139,127,232,0.2)', border: '1px solid rgba(139,127,232,0.35)', borderRadius: '7px', padding: '5px 10px', cursor: 'pointer', color: '#a99ef0', fontSize: '13px', fontFamily: "'Outfit', sans-serif" }}>
-                  {savingName ? '...' : 'OK'}
-                </button>
-                <button onClick={() => { setEditingName(false); setNewName(chatName) }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.5)', fontSize: '13px', fontFamily: "'Outfit', sans-serif", padding: '5px' }}>
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: '#f0f2ff', fontFamily: "'Outfit', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {newName}
-                </p>
-                <button onClick={() => setEditingName(true)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.35)', padding: '2px', display: 'flex', flexShrink: 0 }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#9095b8')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'rgba(144,149,184,0.35)')}
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 24px', flexShrink: 0 }}>
+              <div
+                onClick={() => !uploadingAvatar && avatarFileRef.current?.click()}
+                style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}
+              >
+                <Avatar src={avatarUrl(chatAvatar)} name={chatName} size={52} />
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: 0, transition: 'opacity 0.2s',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M8.5 1.5l2 2L4 10H2v-2l6.5-6.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+                  {uploadingAvatar
+                    ? <Spinner size={16} />
+                    : <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                        <path d="M9 2v9M5.5 5.5L9 2l3.5 3.5" stroke="#e8ecf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M3 13v2a.5.5 0 00.5.5h11a.5.5 0 00.5-.5v-2" stroke="#e8ecf8" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                  }
+                </div>
+                <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
               </div>
-            )}
-            <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'rgba(144,149,184,0.5)', fontFamily: "'Outfit', sans-serif" }}>
-              {participantsCount != null ? `${participantsCount} участников` : `${participants.length} участников`}
-            </p>
-          </div>
-        </div>
 
-        {/* Action buttons */}
-        <div style={{ margin: '0 24px 12px', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
-          <button disabled title="Скоро"
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', background: 'none', border: '1px solid rgba(139,147,210,0.15)', borderRadius: '9px', padding: '7px 12px', cursor: 'default', color: 'rgba(144,149,184,0.3)', fontSize: '13px', fontFamily: "'Outfit', sans-serif" }}>
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            Добавить участника
-          </button>
-        </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {editingName ? (
+                  <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
+                    <input
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSaveName()
+                        if (e.key === 'Escape') { setEditingName(false); setNewName(chatName) }
+                      }}
+                      autoFocus
+                      style={{
+                        flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(139,127,232,0.4)',
+                        borderRadius: '8px', padding: '5px 10px', color: '#f0f2ff',
+                        fontSize: '16px', fontFamily: "'Outfit', sans-serif", fontWeight: 600, outline: 'none',
+                      }}
+                    />
+                    <button onClick={handleSaveName} disabled={savingName}
+                      style={{ background: 'rgba(139,127,232,0.2)', border: '1px solid rgba(139,127,232,0.35)', borderRadius: '7px', padding: '5px 10px', cursor: 'pointer', color: '#a99ef0', fontSize: '13px', fontFamily: "'Outfit', sans-serif" }}>
+                      {savingName ? '...' : 'OK'}
+                    </button>
+                    <button onClick={() => { setEditingName(false); setNewName(chatName) }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.5)', fontSize: '13px', fontFamily: "'Outfit', sans-serif", padding: '5px' }}>
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <p style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: '#f0f2ff', fontFamily: "'Outfit', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {newName}
+                    </p>
+                    <button onClick={() => setEditingName(true)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.35)', padding: '2px', display: 'flex', flexShrink: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#9095b8')}
+                      onMouseLeave={e => (e.currentTarget.style.color = 'rgba(144,149,184,0.35)')}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M8.5 1.5l2 2L4 10H2v-2l6.5-6.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'rgba(144,149,184,0.5)', fontFamily: "'Outfit', sans-serif" }}>
+                  {participantsCount != null ? `${Math.max(participantsCount, participants.length)} участников` : `${participants.length} участников`}
+                </p>
+              </div>
+            </div>
 
-        {/* Search */}
-        <div style={{ padding: '0 24px 10px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,147,210,0.14)', borderRadius: '10px', padding: '0 12px', height: '36px' }}>
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ color: 'rgba(144,149,184,0.4)', flexShrink: 0 }}>
-              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск участников..."
-              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: '#e0e4f8', fontSize: '13.5px', fontFamily: "'Outfit', sans-serif" }} />
-            {query && (
-              <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.4)', padding: 0, display: 'flex' }}>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <div style={{ margin: '0 24px 12px', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
+              <button onClick={() => setAdding(true)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', background: 'none', border: '1px solid rgba(139,147,210,0.15)', borderRadius: '9px', padding: '7px 12px', cursor: 'pointer', color: '#a99ef0', fontSize: '13px', fontFamily: "'Outfit', sans-serif", transition: 'background 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,127,232,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+              >
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
+                Добавить участника
               </button>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px' }}>
-          {loading
-            ? <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}><Spinner size={20} /></div>
-            : participants.length === 0
-              ? <p style={{ textAlign: 'center', padding: '24px', color: 'rgba(144,149,184,0.35)', fontSize: '14px', fontFamily: "'Outfit', sans-serif", margin: 0 }}>Никого не найдено</p>
-              : participants.map(p => <ParticipantRow key={p.id} profile={p} onKick={() => handleKick(p.id)} />)
-          }
-        </div>
+            <div style={{ padding: '0 24px 10px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,147,210,0.14)', borderRadius: '10px', padding: '0 12px', height: '36px' }}>
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ color: 'rgba(144,149,184,0.4)', flexShrink: 0 }}>
+                  <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск участников..."
+                  style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: '#e0e4f8', fontSize: '13.5px', fontFamily: "'Outfit', sans-serif" }} />
+                {query && (
+                  <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(144,149,184,0.4)', padding: 0, display: 'flex' }}>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px' }}>
+              {loading
+                ? <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}><Spinner size={20} /></div>
+                : participants.length === 0
+                  ? <p style={{ textAlign: 'center', padding: '24px', color: 'rgba(144,149,184,0.35)', fontSize: '14px', fontFamily: "'Outfit', sans-serif", margin: 0 }}>Никого не найдено</p>
+                  : participants.map(p => <ParticipantRow key={p.id} profile={p} onKick={() => handleKick(p.id)} />)
+              }
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

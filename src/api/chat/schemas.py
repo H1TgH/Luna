@@ -1,12 +1,14 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.chat.enums import MessageTypeEnum
 
 
 class MessageSenderSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     sender_id: UUID | None
     username: str
     first_name: str
@@ -20,6 +22,8 @@ class MessageCreationSchema(BaseModel):
 
 
 class MessageSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     sender: MessageSenderSchema | None
     content: str
@@ -57,6 +61,8 @@ class MessageHistorySchema(BaseModel):
     chat: ChatInfoSchema
     messages: list[MessageSchema]
     last_read_message_id: UUID | None
+    own_last_read_message_id: UUID | None
+    peer_last_read_message_id: UUID | None
     has_next: bool
     next_cursor: datetime | None
 
