@@ -260,7 +260,7 @@ class ChatRepository:
         )
         await self.session.execute(stmt)
 
-    async def delete_message_for_me(self, message_id: UUID) -> None:
+    async def delete_message_for_me(self, message_id: UUID) -> None:  # Исправить, добавив id пользователя
         stmt = (
             update(MessageModel)
             .where(MessageModel.id == message_id)
