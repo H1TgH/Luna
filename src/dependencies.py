@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyCookie
 
 from core.auth.entities import CurrentUserDTO
 from core.auth.exceptions import EmailNotConfirmedException, InvalidTokenException, UserDoesNotExistException
@@ -7,7 +7,7 @@ from core.auth.services import AuthService, get_auth_service
 
 
 async def get_current_user(
-    token: str = Depends(APIKeyHeader(name="Authorization")),
+    token: str = Depends(APIKeyCookie(name="user_access_token")),
     auth_service: AuthService = Depends(get_auth_service)
 ) -> CurrentUserDTO:
     try:

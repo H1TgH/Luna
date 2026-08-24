@@ -11,6 +11,7 @@ from core.auth.exceptions import (
     EmailNotConfirmedException,
     InvalidCredentialsException,
     InvalidTokenException,
+    TokenIsMissingException,
     UserAlreadyExistsException,
     UserDoesNotExistException,
 )
@@ -55,7 +56,10 @@ class AuthService:
 
         return LoginTokensDTO(access_token=access_token, refresh_token=refresh_token)
 
-    def refresh(self, refresh_token: str) -> str:
+    def refresh(self, refresh_token: str | None) -> str:
+        if not refresh_token:
+            raise TokenIsMissingException("Refresh token is missing")
+
         user_id = self.get_user_id_from_token_or_raise(refresh_token, "refresh")
         return self.create_token(
             {"sub": user_id, "type": "access"},
@@ -135,10 +139,13 @@ class AuthService:
 
     def get_user_id_from_token_or_raise(self, token: str, token_type: str) -> UUID:
         payload = self.verify_token(token, token_type)
-        return payload.get("sub")
+        return UUID(payload.get("sub"))
 
     @staticmethod
-    def verify_token(token: str, token_type: str) -> dict[str, Any]:
+    def verify_token(token: str | None, token_type: str) -> dict[str, Any]:
+        if not token:
+            raise TokenIsMissingException(f"{token_type} token is missing")
+
         try:
             payload = jwt.decode(
                 token,

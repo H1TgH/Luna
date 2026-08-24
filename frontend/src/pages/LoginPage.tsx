@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../api/auth'
 import { profileApi } from '../api/profile'
 import { useAuthStore } from '../store/authStore'
+import { useMeStore } from '../store/meStore'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 
@@ -81,7 +82,7 @@ function LunaLogo() {
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const setTokens = useAuthStore((s) => s.setTokens)
+  const setAuthenticated = useAuthStore((s) => s.setAuthenticated)
 
   const [isLoading, setIsLoading] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
@@ -111,11 +112,13 @@ export default function LoginPage() {
 
     setIsLoading(true)
     try {
-      const { data: tokens } = await authApi.login({ email, password })
-      setTokens(tokens.access_token, tokens.refresh_token)
+      await authApi.login({ email, password })
+      setAuthenticated(true)
 
       try {
         const { data: profile } = await profileApi.getMe()
+        useMeStore.getState().setMe(profile)
+        useMeStore.getState().setFetched(true)
         navigate(`/${profile.username}`)
       } catch (profileErr: unknown) {
         const axiosErr = profileErr as { response?: { status?: number } }
@@ -138,13 +141,13 @@ export default function LoginPage() {
   }
 
   const cardStyle: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.032)',
+    background: 'rgba(255,255,255,0.045)',
     backdropFilter: 'blur(32px)',
     WebkitBackdropFilter: 'blur(32px)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid rgba(169,158,240,0.14)',
     borderRadius: '20px',
     padding: '36px 36px 40px',
-    boxShadow: '0 8px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(139,127,232,0.06)',
+    boxShadow: '0 8px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(139,127,232,0.08)',
   }
 
   return (
@@ -163,7 +166,7 @@ export default function LoginPage() {
         <div className="animate-fade-in" style={{ textAlign: 'center', marginBottom: '28px' }}>
           <LunaLogo />
           <p style={{
-            color: '#6b729c', fontSize: '15px', fontWeight: 300,
+            color: 'rgba(169,158,240,0.55)', fontSize: '15px', fontWeight: 300,
             marginTop: '10px', letterSpacing: '0.03em',
             fontFamily: "'Outfit', sans-serif",
           }}>
@@ -238,7 +241,7 @@ export default function LoginPage() {
               )}
             </Button>
 
-            <p style={{ textAlign: 'center', fontSize: '14px', color: '#4a5070', fontFamily: "'Outfit', sans-serif" }}>
+            <p style={{ textAlign: 'center', fontSize: '14px', color: 'rgba(107,114,156,0.75)', fontFamily: "'Outfit', sans-serif" }}>
               Нет аккаунта?{' '}
               <Link
                 to="/register"

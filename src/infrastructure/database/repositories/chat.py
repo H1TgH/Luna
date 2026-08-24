@@ -22,11 +22,12 @@ class ChatRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create_chat(self, data: ChatCreationDTO) -> ChatModel:
+    async def create_chat(self, data: ChatCreationDTO, chat_avatar_key: str | None) -> ChatModel:
         chat = ChatModel(
             is_group=data.is_group,
             name=data.name,
-            creator_id=data.creator_id
+            creator_id=data.creator_id,
+            avatar_key=chat_avatar_key
         )
         self.session.add(chat)
         await self.session.flush()
@@ -177,7 +178,7 @@ class ChatRepository:
     ) -> list[MessageDTO]:
         stmt = (
             select(MessageModel, ProfileModel)
-            .join(ProfileModel, MessageModel.sender_id == ProfileModel.id)
+            .outerjoin(ProfileModel, MessageModel.sender_id == ProfileModel.id)
             .where(MessageModel.chat_id == chat_id)
             .order_by(MessageModel.created_at.desc())
             .limit(limit)
@@ -259,7 +260,7 @@ class ChatRepository:
         )
         await self.session.execute(stmt)
 
-    async def delete_message_for_me(self, message_id: UUID) -> None:
+    async def delete_message_for_me(self, message_id: UUID) -> None:  # Исправить, добавив id пользователя
         stmt = (
             update(MessageModel)
             .where(MessageModel.id == message_id)
@@ -284,6 +285,80 @@ class ChatRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_peer_last_read_message_id(self, chat_id: UUID, current_user_id: UUID) -> UUID | None:
+        stmt = (
+            select(ChatParticipantModel.last_read_message_id)
+            .join(
+                MessageModel,
+                MessageModel.id == ChatParticipantModel.last_read_message_id
+            )
+            .where(
+                ChatParticipantModel.chat_id == chat_id,
+                ChatParticipantModel.user_id != current_user_id,
+                ChatParticipantModel.last_read_message_id.is_not(None)
+            )
+            .order_by(MessageModel.created_at.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def delete_user_from_chat(self, chat_id: UUID, user_id: UUID) -> None:
+        stmt = (
+            delete(ChatParticipantModel)
+            .where(
+                ChatParticipantModel.chat_id == chat_id,
+                ChatParticipantModel.user_id == user_id
+            )
+        )
+        await self.session.execute(stmt)
+
+    async def get_chat_participants_ids(
+        self,
+        chat_id: UUID
+    ) -> list[UUID]:
+        stmt = (
+            select(ChatParticipantModel.user_id)
+            .where(ChatParticipantModel.chat_id == chat_id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def update_chat_name(
+        self,
+        chat_id: UUID,
+        new_name: str
+    ) -> None:
+        stmt = (
+            update(ChatModel)
+            .where(ChatModel.id == chat_id)
+            .values(name=new_name)
+        )
+        await self.session.execute(stmt)
+
+    async def update_chat_avatar_key(
+        self,
+        chat_id: UUID,
+        avatar_key: str
+    ) -> None:
+        stmt = (
+            update(ChatModel)
+            .where(ChatModel.id == chat_id)
+            .values(avatar_key=avatar_key)
+        )
+        await self.session.execute(stmt)
+
+    async def add_user_to_chat(
+        self,
+        chat_id: UUID,
+        user_id: UUID
+    ) -> None:
+        participant = ChatParticipantModel(
+            chat_id=chat_id,
+            user_id=user_id
+        )
+        self.session.add(participant)
 
     @staticmethod
     def _build_chat_dto(
@@ -332,7 +407,7 @@ class ChatRepository:
                 first_name=sender.first_name,
                 last_name=sender.last_name,
                 avatar_key=f"{settings.s3.public_endpoint}/media/avatars/{sender.avatar_key}"
-            ),
+            ) if sender else None,
             content=message.content,
             type=message.type,
             is_edited=message.is_edited,

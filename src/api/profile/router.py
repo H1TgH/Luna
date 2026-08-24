@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
@@ -67,6 +68,23 @@ async def profiles_search(
     return [ProfileSchema(**asdict(p)) for p in profiles]
 
 
+@profile_router.get(
+    "/search/interlocutors",
+    status_code=200,
+    response_model=list[ProfileSchema],
+)
+async def get_interlocutors(
+    query: str = Query("", min_length=0, max_length=50),
+    limit: int = Query(15, le=30),
+    offset: int = Query(0),
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
+):
+    profiles = await service.search_interlocutors(query, current_user.id, limit, offset)
+
+    return [ProfileSchema(**asdict(p)) for p in profiles]
+
+
 @profile_router.patch(
     "/me",
     status_code=status.HTTP_204_NO_CONTENT
@@ -106,9 +124,50 @@ async def upload_avatar(
 @handle_profile_exceptions
 async def get_profile(
     username: str,
-    service: ProfileService = Depends(get_profile_service),
-    current_user: CurrentUserDTO = Depends(get_current_user)
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
 ):
     profile = await service.get_by_username(username)
 
     return ProfileSchema(**asdict(profile))
+
+
+@profile_router.get(
+    "/{chat_id}/participants",
+    status_code=status.HTTP_200_OK,
+    response_model=list[ProfileSchema]
+)
+async def get_group_chat_participants(
+    chat_id: UUID,
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0),
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
+):
+    profiles = await service.get_group_chat_participants(chat_id, current_user.id, limit, offset)
+
+    return [ProfileSchema(**asdict(profile)) for profile in profiles]
+
+
+@profile_router.get(
+    "/{chat_id}/participants/search",
+    status_code=status.HTTP_200_OK,
+    response_model=list[ProfileSchema]
+)
+async def search_chat_participants(
+    chat_id: UUID,
+    query: str = Query(...),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0),
+    current_user: CurrentUserDTO = Depends(get_current_user),
+    service: ProfileService = Depends(get_profile_service)
+):
+    profiles = await service.search_chat_participants(
+        chat_id,
+        current_user.id,
+        query,
+        limit,
+        offset
+    )
+
+    return [ProfileSchema(**asdict(profile)) for profile in profiles]

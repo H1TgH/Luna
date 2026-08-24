@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.profile.entities import ProfileCreationDTO
+from infrastructure.database.models.chat import ChatModel, ChatParticipantModel
 from infrastructure.database.models.profile import ProfileModel
 
 
@@ -78,3 +79,108 @@ class ProfileRepository:
         results = await self.session.execute(stmt)
 
         return results.scalars().all()
+
+    async def search_interlocutors(
+        self,
+        query: str,
+        current_user_id: UUID,
+        limit: int = 15,
+        offset: int = 0,
+        threshold: float = 0.25
+    ) -> list[ProfileModel]:
+        query_lower = query.lower()
+
+        current_user_chat_ids = (
+            select(ChatParticipantModel.chat_id)
+            .join(ChatModel, ChatParticipantModel.chat_id == ChatModel.id)
+            .where(
+                ChatParticipantModel.user_id == current_user_id,
+                ChatModel.last_message_id.is_not(None),
+                ChatModel.is_group.is_(False)
+            )
+        )
+
+        stmt = (
+            select(ProfileModel)
+            .join(ChatParticipantModel, ProfileModel.id == ChatParticipantModel.user_id)
+            .where(
+                ChatParticipantModel.chat_id.in_(current_user_chat_ids),
+                ChatParticipantModel.user_id != current_user_id
+            )
+            .order_by(
+                func.greatest(
+                    func.similarity(func.lower(ProfileModel.username), query_lower),
+                    func.similarity(func.lower(ProfileModel.first_name), query_lower),
+                    func.similarity(func.lower(ProfileModel.last_name), query_lower),
+                ).desc()
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+        if query.strip() != "":
+            stmt = stmt.where(
+                or_(
+                    func.similarity(ProfileModel.username, query) > threshold,
+                    func.similarity(ProfileModel.first_name, query) > threshold,
+                    func.similarity(ProfileModel.last_name, query) > threshold,
+                    ProfileModel.username.ilike(f"%{query}%"),
+                    ProfileModel.first_name.ilike(f"%{query}%"),
+                    ProfileModel.last_name.ilike(f"%{query}%"),
+                )
+            )
+
+        results = await self.session.execute(stmt)
+
+        return results.scalars().all()
+
+    async def get_group_chat_participants(
+        self,
+        chat_id: UUID,
+        current_user_id: UUID,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[ProfileModel]:
+        stmt = (
+            select(ProfileModel)
+            .join(ChatParticipantModel, ProfileModel.id == ChatParticipantModel.user_id)
+            .where(
+                ChatParticipantModel.chat_id == chat_id
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+
+        result = await self.session.execute(stmt)
+
+        return result.scalars().all()
+
+    async def search_chat_participants(
+        self,
+        chat_id: UUID,
+        current_user_id: UUID,
+        query: str,
+        limit: int = 20,
+        offset: int = 0,
+        threshold: float = 0.25
+    ) -> list[ProfileModel]:
+        stmt = (
+            select(ProfileModel)
+            .join(ChatParticipantModel, ProfileModel.id == ChatParticipantModel.user_id)
+            .where(
+                or_(
+                    func.similarity(ProfileModel.username, query) > threshold,
+                    func.similarity(ProfileModel.first_name, query) > threshold,
+                    func.similarity(ProfileModel.last_name, query) > threshold,
+                    ProfileModel.username.ilike(f"%{query}%"),
+                    ProfileModel.first_name.ilike(f"%{query}%"),
+                    ProfileModel.last_name.ilike(f"%{query}%"),
+                ),
+                ChatParticipantModel.chat_id == chat_id
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+
+        result = await self.session.execute(stmt)
+
+        return result.scalars().all()

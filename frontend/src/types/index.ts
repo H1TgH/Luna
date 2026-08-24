@@ -1,8 +1,3 @@
-export interface TokensResponse {
-  access_token: string
-  refresh_token: string
-}
-
 export interface ProfileResponse {
   id: string
   username: string
@@ -97,8 +92,12 @@ export interface ChatInfoResponse {
   id: string
   is_group: boolean
   name: string | null
+  participants_count: number | null
+  online_participants_count: number | null
+  username: string | null
   avatar_url: string | null
-  username?: string | null
+  is_online: boolean | null
+  last_seen: string | null
 }
 
 export interface ChatResponse {
@@ -122,6 +121,8 @@ export interface MessageHistoryResponse {
   chat: ChatInfoResponse
   messages: ChatMessageResponse[]
   last_read_message_id: string | null
+  own_last_read_message_id?: string | null
+  peer_last_read_message_id?: string | null
   has_next: boolean
   next_cursor: string | null
 }

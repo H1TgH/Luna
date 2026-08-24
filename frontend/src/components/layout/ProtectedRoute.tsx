@@ -1,45 +1,73 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import { useMeStore } from '../../store/meStore'
 import { authApi } from '../../api/auth'
+import { profileApi } from '../../api/profile'
+import LoadingSpinner from '../ui/LoadingSpinner'
+
+async function verifySession(): Promise<boolean> {
+  const { setAuthenticated, clearAuth } = useAuthStore.getState()
+
+  const tryLoadProfile = async () => {
+    const { data } = await profileApi.getMe()
+    useMeStore.getState().setMe(data)
+    useMeStore.getState().setFetched(true)
+    setAuthenticated(true)
+  }
+
+  try {
+    await tryLoadProfile()
+    return true
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status
+    if (status !== 401) {
+      clearAuth()
+      return false
+    }
+  }
+
+  try {
+    await authApi.refresh()
+    await tryLoadProfile()
+    return true
+  } catch {
+    clearAuth()
+    return false
+  }
+}
 
 export default function ProtectedRoute() {
-  const { accessToken, refreshToken, _hasHydrated, setTokens, clearTokens } = useAuthStore()
-  const [checking, setChecking] = useState(true)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const [checking, setChecking] = useState(!isAuthenticated)
 
   useEffect(() => {
-    if (!_hasHydrated) return
-
-    if (accessToken) {
+    if (isAuthenticated) {
       setChecking(false)
       return
     }
 
-    if (refreshToken) {
-      authApi.refresh(refreshToken)
-        .then(({ data }) => {
-          const stored = localStorage.getItem('luna-auth')
-          const currentRefresh = stored ? JSON.parse(stored)?.state?.refreshToken : refreshToken
-          setTokens(data.token, currentRefresh ?? refreshToken)
-        })
-        .catch(() => clearTokens())
-        .finally(() => setChecking(false))
-    } else {
-      setChecking(false)
-    }
-  }, [_hasHydrated, accessToken, refreshToken, setTokens, clearTokens])
+    let cancelled = false
+    verifySession().finally(() => {
+      if (!cancelled) setChecking(false)
+    })
 
-  if (!_hasHydrated || checking) {
+    return () => { cancelled = true }
+  }, [isAuthenticated])
+
+  if (checking) {
     return (
-      <div style={{ minHeight: '100vh', background: '#06091a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg style={{ animation: 'spin 1s linear infinite' }} width="26" height="26" viewBox="0 0 24 24" fill="none">
-          <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
-          <circle cx="12" cy="12" r="10" stroke="#8b7fe8" strokeWidth="2.5" opacity="0.2" />
-          <path d="M4 12a8 8 0 018-8" stroke="#8b7fe8" strokeWidth="2.5" strokeLinecap="round" />
-        </svg>
+      <div style={{
+        minHeight: '100vh',
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(88,70,180,0.12) 0%, #06091a 55%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <LoadingSpinner label="Проверяем сессию..." />
       </div>
     )
   }
 
-  return accessToken ? <Outlet /> : <Navigate to="/login" replace />
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
 }

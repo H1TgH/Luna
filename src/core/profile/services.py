@@ -91,6 +91,82 @@ class ProfileService:
                 for profile in profiles
             ]
 
+    async def search_interlocutors(
+        self,
+        query: str,
+        current_user_id: UUID,
+        limit: int = 15,
+        offset: int = 0,
+        threshold: float = 0.25
+    ) -> list[ProfileReadDTO]:
+        async with self.uow() as session:
+            profile_repo = ProfileRepository(session)
+
+            profiles = await profile_repo.search_interlocutors(
+                query=query,
+                current_user_id=current_user_id,
+                limit=limit,
+                offset=offset,
+                threshold=threshold
+            )
+
+            if not profiles:
+                return []
+
+            return [
+                ProfileReadDTO.from_model(profile, self._build_avatar_url(profile.avatar_key))
+                for profile in profiles
+            ]
+
+    async def get_group_chat_participants(
+        self,
+        chat_id: UUID,
+        current_user_id: UUID,
+        limit: int = 20,
+        offset: int = 0
+    ) -> list[ProfileReadDTO]:
+        async with self.uow() as session:
+            repo = ProfileRepository(session)
+
+            profiles = await repo.get_group_chat_participants(chat_id, current_user_id, limit, offset)
+
+            if not profiles:
+                return []
+
+            return [
+                ProfileReadDTO.from_model(profile, self._build_avatar_url(profile.avatar_key))
+                for profile in profiles
+            ]
+
+    async def search_chat_participants(
+        self,
+        chat_id: UUID,
+        current_user_id: UUID,
+        query: str,
+        limit: int = 20,
+        offset: int = 0,
+        threshold: float = 0.25
+    ) -> list[ProfileReadDTO]:
+        async with self.uow() as session:
+            repo = ProfileRepository(session)
+
+            profiles = await repo.search_chat_participants(
+                chat_id,
+                current_user_id,
+                query,
+                limit,
+                offset,
+                threshold
+            )
+
+            if not profiles:
+                return []
+
+            return [
+                ProfileReadDTO.from_model(profile, self._build_avatar_url(profile.avatar_key))
+                for profile in profiles
+            ]
+
     def _build_avatar_url(self, avatar_key: str | None) -> str | None:
         if not avatar_key:
             return None

@@ -12,15 +12,6 @@ class UserLoginSchema(BaseModel):
     password: str
 
 
-class TokensSchema(BaseModel):
-    access_token: str
-    refresh_token: str
-
-
-class TokenSchema(BaseModel):
-    token: str
-
-
 class RequestPasswordResetSchema(BaseModel):
     email: str
 

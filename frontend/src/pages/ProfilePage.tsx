@@ -854,11 +854,7 @@ export default function ProfilePage() {
     if (!viewedProfile || startingChat) return
     setStartingChat(true)
     try {
-      const { data } = await chatApi.createOrGet({
-        is_group: false,
-        name: null,
-        users_ids: [viewedProfile.id],
-      })
+      const { data } = await chatApi.createPersonal(viewedProfile.id)
       navigate(`/chats/${data.id}`)
     } catch (e) {
       console.error(e)
@@ -1114,7 +1110,7 @@ export default function ProfilePage() {
               ))}
               {!postsLoading && posts.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '56px 0', color: 'rgba(107,114,156,0.4)', fontFamily: "'Outfit', sans-serif", fontSize: '15px', fontWeight: 300 }}>
-                  {isOwnProfile ? 'Поделитесь чем-нибудь первым ✨' : 'Пока нет постов'}
+                  {isOwnProfile ? 'Поделитесь чем-нибудь первым' : 'Пока нет постов'}
                 </div>
               )}
               <div ref={sentinelRef} style={{ height: '1px' }} />

@@ -25,6 +25,7 @@ export default defineConfig({
       '/api': {
         target: 'http://fastapi_app:8000',
         changeOrigin: true,
+        ws: true,
       },
       '/media': {
         target: 'http://minio:9000',

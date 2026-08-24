@@ -14,5 +14,9 @@ class InvalidTokenException(Exception):
     pass
 
 
+class TokenIsMissingException(Exception):
+    pass
+
+
 class EmailNotConfirmedException(Exception):
     pass
