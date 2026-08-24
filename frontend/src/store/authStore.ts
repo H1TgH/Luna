@@ -1,30 +1,17 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 
 interface AuthState {
-  accessToken: string | null
-  refreshToken: string | null
-  _hasHydrated: boolean
-  setTokens: (access: string, refresh: string) => void
-  clearTokens: () => void
-  setHasHydrated: (v: boolean) => void
+  isAuthenticated: boolean
+  setAuthenticated: (value: boolean) => void
+  clearAuth: () => void
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      accessToken: null,
-      refreshToken: null,
-      _hasHydrated: false,
-      setTokens: (access, refresh) => set({ accessToken: access, refreshToken: refresh }),
-      clearTokens: () => set({ accessToken: null, refreshToken: null }),
-      setHasHydrated: (v) => set({ _hasHydrated: v }),
-    }),
-    {
-      name: 'luna-auth',
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true)
-      },
-    }
-  )
-)
+export const useAuthStore = create<AuthState>()((set) => ({
+  isAuthenticated: false,
+  setAuthenticated: (value) => set({ isAuthenticated: value }),
+  clearAuth: () => set({ isAuthenticated: false }),
+}))
+
+if (typeof localStorage !== 'undefined' && localStorage.getItem('luna-auth')) {
+  localStorage.removeItem('luna-auth')
+}

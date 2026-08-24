@@ -4,65 +4,53 @@ import { useAuthStore } from '../store/authStore'
 export const api = axios.create({
   baseURL: '/',
   timeout: 15000,
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })
 
-api.interceptors.request.use((config) => {
-  const { accessToken } = useAuthStore.getState()
-  if (accessToken) config.headers.Authorization = accessToken
-  return config
-})
-
 let isRefreshing = false
-let queue: Array<(token: string) => void> = []
+let queue: Array<{ resolve: () => void; reject: (err: unknown) => void }> = []
+
+const isAuthRoute = (url?: string) =>
+  !!url && (
+    url.includes('/auth/login') ||
+    url.includes('/auth/register') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/logout')
+  )
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
-    const isAuthRoute = original?.url?.includes('/auth/login') ||
-      original?.url?.includes('/auth/register') ||
-      original?.url?.includes('/auth/refresh')
 
-    if (error.response?.status === 401 && !isAuthRoute && !original._retry) {
+    if (error.response?.status === 401 && !isAuthRoute(original?.url) && !original._retry) {
       original._retry = true
-      const { refreshToken, setTokens, clearTokens } = useAuthStore.getState()
-
-      if (!refreshToken) {
-        clearTokens()
-        window.location.href = '/login'
-        return Promise.reject(error)
-      }
 
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          queue.push((token) => {
-            original.headers.Authorization = token
-            resolve(api(original))
-          })
-        })
+        return new Promise((resolve, reject) => {
+          queue.push({ resolve, reject })
+        }).then(() => api(original))
       }
 
       isRefreshing = true
       try {
-        const { data } = await api.post('/api/v1/users/auth/refresh', { token: refreshToken })
-        const newAccess = data.token
-        setTokens(newAccess, refreshToken)
-        queue.forEach((cb) => cb(newAccess))
+        await api.post('/api/v1/users/auth/refresh')
+        queue.forEach(({ resolve }) => resolve())
         queue = []
-        original.headers.Authorization = newAccess
         return api(original)
-      } catch {
-        clearTokens()
+      } catch (refreshError) {
+        queue.forEach(({ reject }) => reject(refreshError))
         queue = []
+        useAuthStore.getState().clearAuth()
         window.location.href = '/login'
-        return Promise.reject(error)
+        return Promise.reject(refreshError)
       } finally {
         isRefreshing = false
       }
     }
 
-    if (error.response?.status === 403 && !isAuthRoute) {
+    if (error.response?.status === 403 && !isAuthRoute(original?.url)) {
       window.location.href = '/confirm-email-pending'
       return Promise.reject(error)
     }

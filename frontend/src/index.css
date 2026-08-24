@@ -42,3 +42,13 @@ input[type='date']::-webkit-calendar-picker-indicator {
 .animate-fade-in { animation: fadeIn 0.4s ease-out both; }
 .animate-slide-up { animation: slideUp 0.45s ease-out both; animation-delay: 0.05s; }
 .animate-step-in { animation: stepIn 0.3s ease-out both; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+::selection {
+  background: rgba(139, 127, 232, 0.35);
+  color: #f0f2ff;
+}

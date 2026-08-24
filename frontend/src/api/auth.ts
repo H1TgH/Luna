@@ -1,15 +1,17 @@
 import { api } from './client'
-import type { TokensResponse } from '../types'
 
 export const authApi = {
   register: (data: { email: string; password: string }) =>
     api.post<{ msg: string }>('/api/v1/users/auth/register', data),
 
   login: (data: { email: string; password: string }) =>
-    api.post<TokensResponse>('/api/v1/users/auth/login', data),
+    api.post<{ msg: string }>('/api/v1/users/auth/login', data),
 
-  refresh: (token: string) =>
-    api.post<{ token: string }>('/api/v1/users/auth/refresh', { token }),
+  refresh: () =>
+    api.post<void>('/api/v1/users/auth/refresh'),
+
+  logout: () =>
+    api.post<void>('/api/v1/users/auth/logout'),
 
   confirmEmail: (token: string) =>
     api.post(`/api/v1/users/auth/confirm-email?token=${token}`),

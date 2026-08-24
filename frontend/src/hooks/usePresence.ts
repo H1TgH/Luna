@@ -4,12 +4,12 @@ import { useAuthStore } from '../store/authStore'
 const PING_INTERVAL_MS = 30_000
 
 export function usePresence() {
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const wsRef = useRef<WebSocket | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    if (!accessToken) return
+    if (!isAuthenticated) return
 
     let disposed = false
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -34,12 +34,13 @@ export function usePresence() {
       wsRef.current = null
     }
 
-    const openConnection = (token: string) => {
+    const openConnection = () => {
       if (disposed) return
+      if (!useAuthStore.getState().isAuthenticated) return
       cleanupSocket()
 
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const url = `${proto}://${window.location.host}/api/v1/presense/ws?token=${token}`
+      const url = `${proto}://${window.location.host}/api/v1/presense/ws`
       const ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -54,19 +55,13 @@ export function usePresence() {
         wsRef.current = null
         stopPing()
         if (disposed) return
-        reconnectTimer = setTimeout(() => {
-          const currentToken = useAuthStore.getState().accessToken
-          if (currentToken) openConnection(currentToken)
-        }, 3_000)
+        reconnectTimer = setTimeout(openConnection, 3_000)
       }
 
       ws.onerror = () => { }
     }
 
-    startTimer = setTimeout(() => {
-      const token = useAuthStore.getState().accessToken
-      if (token) openConnection(token)
-    }, 50)
+    startTimer = setTimeout(openConnection, 50)
 
     return () => {
       disposed = true
@@ -74,5 +69,5 @@ export function usePresence() {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       cleanupSocket()
     }
-  }, [accessToken])
+  }, [isAuthenticated])
 }

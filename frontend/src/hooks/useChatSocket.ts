@@ -12,7 +12,7 @@ type ChatWsHandlers = {
 }
 
 export function useChatSocket(chatId: string | null, handlers: ChatWsHandlers = {}) {
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const wsRef = useRef<WebSocket | null>(null)
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
@@ -28,7 +28,7 @@ export function useChatSocket(chatId: string | null, handlers: ChatWsHandlers = 
   }, [])
 
   useEffect(() => {
-    if (!chatId || !accessToken) return
+    if (!chatId || !isAuthenticated) return
 
     let disposed = false
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -47,15 +47,15 @@ export function useChatSocket(chatId: string | null, handlers: ChatWsHandlers = 
 
     const connect = () => {
       if (disposed) return
+      if (!useAuthStore.getState().isAuthenticated) return
 
-      const token = useAuthStore.getState().accessToken
       const id = chatIdRef.current
-      if (!token || !id) return
+      if (!id) return
 
       cleanupSocket()
 
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const url = `${proto}://${window.location.host}/api/v1/chats/ws/${id}?token=${token}`
+      const url = `${proto}://${window.location.host}/api/v1/chats/ws/${id}`
       const ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -90,7 +90,6 @@ export function useChatSocket(chatId: string | null, handlers: ChatWsHandlers = 
       ws.onerror = () => { }
     }
 
-    // чтобы strict mode не рвал handshake
     startTimer = setTimeout(connect, 50)
 
     return () => {
@@ -99,7 +98,7 @@ export function useChatSocket(chatId: string | null, handlers: ChatWsHandlers = 
       if (reconnectTimer) clearTimeout(reconnectTimer)
       cleanupSocket()
     }
-  }, [chatId, accessToken])
+  }, [chatId, isAuthenticated])
 
   return { send }
 }

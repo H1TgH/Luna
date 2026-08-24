@@ -13,16 +13,16 @@ presense_router = APIRouter(
 @presense_router.websocket("/ws")
 async def get_presense_status(
     websocket: WebSocket,
-    token: str = Query(),
     auth_service: AuthService = Depends(get_auth_service),
     presense_service: PresenseService = Depends(get_presense_service)
 ):
-    await websocket.accept()
+    token = websocket.cookies.get("user_access_token", None)
     payload = auth_service.verify_token(token, "access")
     if not payload:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
         return
     user_id = payload.get("sub")
+    await websocket.accept()
 
     try:
         while True:

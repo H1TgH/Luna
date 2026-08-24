@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import { authApi } from '../../api/auth'
 import { useMeStore } from '../../store/meStore'
 import { useMe } from '../../hooks/useMe'
 import { searchApi } from '../../api/search'
@@ -271,13 +272,16 @@ function SearchBar() {
 export default function Header() {
   const navigate = useNavigate()
   const location = useLocation()
-  const clearTokens = useAuthStore((s) => s.clearTokens)
+  const clearAuth = useAuthStore((s) => s.clearAuth)
   const clearMe = useMeStore((s) => s.clear)
   useMe()
   const me = useMeStore((s) => s.me)
 
-  const handleLogout = () => {
-    clearTokens()
+  const handleLogout = async () => {
+    try {
+      await authApi.logout()
+    } catch { /* proceed with local cleanup even if server call fails */ }
+    clearAuth()
     clearMe()
     navigate('/login')
   }
@@ -290,7 +294,7 @@ export default function Header() {
       background: 'rgba(6,9,26,0.88)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      borderBottom: '1px solid rgba(169,158,240,0.1)',
     }}>
       <div style={{
         maxWidth: '900px', margin: '0 auto',

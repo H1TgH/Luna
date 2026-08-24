@@ -1,8 +1,3 @@
-export interface TokensResponse {
-  access_token: string
-  refresh_token: string
-}
-
 export interface ProfileResponse {
   id: string
   username: string

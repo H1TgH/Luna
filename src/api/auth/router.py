@@ -1,16 +1,15 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from api.auth.decorators import handle_auth_exceptions
 from api.auth.schemas import (
     PasswordResetSchema,
     RequestPasswordResetSchema,
-    TokenSchema,
-    TokensSchema,
     UserLoginSchema,
     UserRegistrationSchema,
 )
 from core.auth.entities import UserCreationDTO, UserLoginDTO
 from core.auth.services import AuthService, get_auth_service
+from settings import settings
 
 
 auth_router = APIRouter(
@@ -54,35 +53,61 @@ async def confirm_email(
 @auth_router.post(
     "/login",
     status_code=status.HTTP_200_OK,
-    response_model=TokensSchema,
 )
 @handle_auth_exceptions
 async def login_user(
     creds: UserLoginSchema,
+    response: Response,
     service: AuthService = Depends(get_auth_service)
 ):
     dto = UserLoginDTO(**creds.model_dump())
 
     tokens = await service.login(dto)
 
+    response.set_cookie(
+        "user_access_token",
+        tokens.access_token,
+        max_age=settings.security.access_ttl * 60,
+        # secure=True, noqa: ERA001
+        httponly=True,
+        samesite="lax"
+    )
+    response.set_cookie(
+        "user_refresh_token",
+        tokens.refresh_token,
+        max_age=settings.security.refresh_ttl * 24 * 60 * 60,
+        # secure=True, noqa: ERA001
+        httponly=True,
+        samesite="lax",
+    )
+
     return {
-        "access_token": tokens.access_token,
-        "refresh_token": tokens.refresh_token,
+        "msg": "User authenticated successfully"
     }
 
 
 @auth_router.post(
     "/refresh",
-    status_code=status.HTTP_200_OK,
-    response_model=TokenSchema
+    status_code=status.HTTP_200_OK
 )
 @handle_auth_exceptions
 async def refresh_user(
-    token: TokenSchema,
+    request: Request,
+    response: Response,
     service: AuthService = Depends(get_auth_service)
 ):
-    new_token = service.refresh(token.token)
-    return {"token": new_token}
+    token = request.cookies.get("user_refresh_token", None)
+
+    new_token = service.refresh(token)
+
+    response.set_cookie(
+        "user_access_token",
+        new_token,
+        max_age=settings.security.access_ttl * 60,
+        # secure=True, noqa: ERA001
+        httponly=True,
+        samesite="lax"
+    )
 
 
 @auth_router.post(
@@ -110,3 +135,14 @@ async def reset_password(
     user_id = service.get_user_id_from_token_or_raise(token, "password_reset")
 
     await service.change_password(user_id, new_password.new_password)
+
+
+@auth_router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK
+)
+async def logout(
+    response: Response
+):
+    response.delete_cookie("user_access_token")
+    response.delete_cookie("user_refresh_token")

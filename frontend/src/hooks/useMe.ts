@@ -6,10 +6,10 @@ import { useMeStore } from '../store/meStore'
 let inflightRequest: Promise<void> | null = null
 
 export function useMe() {
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!isAuthenticated) {
       inflightRequest = null
       useMeStore.getState().clear()
       return
@@ -31,5 +31,5 @@ export function useMe() {
       .finally(() => {
         inflightRequest = null
       })
-  }, [accessToken])
+  }, [isAuthenticated])
 }

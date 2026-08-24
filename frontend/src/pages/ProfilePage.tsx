@@ -1110,7 +1110,7 @@ export default function ProfilePage() {
               ))}
               {!postsLoading && posts.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '56px 0', color: 'rgba(107,114,156,0.4)', fontFamily: "'Outfit', sans-serif", fontSize: '15px', fontWeight: 300 }}>
-                  {isOwnProfile ? 'Поделитесь чем-нибудь первым ✨' : 'Пока нет постов'}
+                  {isOwnProfile ? 'Поделитесь чем-нибудь первым' : 'Пока нет постов'}
                 </div>
               )}
               <div ref={sentinelRef} style={{ height: '1px' }} />

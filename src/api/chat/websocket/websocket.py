@@ -3,7 +3,6 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
-    Query,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -30,13 +29,14 @@ chat_ws_router = APIRouter(
 async def chat_ws(
     websocket: WebSocket,
     chat_id: UUID,
-    token: str = Query(),
     chat_service: ChatService = Depends(get_chat_service),
     auth_service: AuthService = Depends(get_auth_service),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     try:
+        token = websocket.cookies.get("user_access_token", None)
         payload = auth_service.verify_token(token, "access")
+
     except InvalidTokenException:
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
@@ -70,8 +70,7 @@ async def chat_ws(
                     data=data,
                 )
 
-            except Exception as e:
-                print(e)
+            except Exception:
                 raise
 
     except WebSocketDisconnect:
