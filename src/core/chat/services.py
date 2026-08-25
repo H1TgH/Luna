@@ -120,11 +120,15 @@ class ChatService:
             chat_repo = ChatRepository(session)
             profile_repo = ProfileRepository(session)
 
-            await self._check_user_is_participant_or_raise(chat_repo, message_data.chat_id, message_data.sender_id)
+            if message_data.type != MessageTypeEnum.SYSTEM:
+                await self._check_user_is_participant_or_raise(chat_repo, message_data.chat_id, message_data.sender_id)
 
             message = await chat_repo.create_message(message_data)
             sender = await profile_repo.get_by_user_id(message_data.sender_id)
-            avatar_url = self._build_avatar_url(sender.avatar_key)
+
+            avatar_url = None
+            if sender:
+                avatar_url = self._build_avatar_url(sender.avatar_key)
 
             await chat_repo.update_chat_last_message(message.chat_id, message.id)
             await chat_repo.mark_as_read(message_data.chat_id, message_data.sender_id, message.id)
@@ -360,7 +364,7 @@ class ChatService:
     @staticmethod
     def _build_message_dto(
         message: MessageModel,
-        sender: ProfileModel,
+        sender: ProfileModel | None,
         avatar_url: str | None
     ):
         return MessageDTO(
@@ -371,7 +375,7 @@ class ChatService:
                 first_name=sender.first_name,
                 last_name=sender.last_name,
                 avatar_key=avatar_url
-            ),
+            ) if sender else None,
             content=message.content,
             type=message.type,
             is_edited=message.is_edited,

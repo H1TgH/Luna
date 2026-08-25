@@ -9,6 +9,8 @@ type ChatWsHandlers = {
   onMessageRead?: (messageId: string, readerId?: string) => void
   onUserTyping?: (userId: string) => void
   onChatRenamed?: (name: string) => void
+  onParticipantAdded?: (invitedUserId: string, inviterId: string) => void
+  onParticipantKicked?: (kickedUserId: string, initiatorId: string) => void
 }
 
 export function useChatSocket(chatId: string | null, handlers: ChatWsHandlers = {}) {
@@ -77,6 +79,10 @@ export function useChatSocket(chatId: string | null, handlers: ChatWsHandlers = 
             h.onUserTyping?.(data.user_id)
           } else if (event_type === 'chat_renamed') {
             h.onChatRenamed?.(data.new_chat_name)
+          } else if (event_type === 'participant_added') {
+            h.onParticipantAdded?.(String(data.invited_user_id), String(data.inviter_id))
+          } else if (event_type === 'participant_kicked') {
+            h.onParticipantKicked?.(String(data.kicked_user_id), String(data.initiator_id))
           }
         } catch { }
       }

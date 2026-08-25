@@ -152,11 +152,14 @@ function InviteRow({ profile, inviting, onInvite }: {
 
 // ─── GroupChatInfoModal ───────────────────────────────────────────────────────
 
-export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, participantsCount, onClose, onChatUpdated }: {
+export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, participantsCount, participantsRevision = 0, wsSend, onClose, onChatUpdated }: {
   chatId: string
   chatName: string
   chatAvatar: string | null
   participantsCount: number | null
+  /** Инкремент снаружи при participant_added / participant_kicked — перезагрузка списка */
+  participantsRevision?: number
+  wsSend: (payload: Record<string, unknown>) => boolean
   onClose: () => void
   onChatUpdated: (name: string, avatarUrl: string | null) => void
 }) {
@@ -177,27 +180,15 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
   const debouncedInvite = useDebounce(inviteQuery, 280)
 
   useEffect(() => {
-    chatApi.getParticipants(chatId)
-      .then(({ data }) => setParticipants(data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [chatId])
-
-  useEffect(() => {
-    if (!debouncedQuery.trim()) {
-      setLoading(true)
-      chatApi.getParticipants(chatId)
-        .then(({ data }) => setParticipants(data))
-        .catch(console.error)
-        .finally(() => setLoading(false))
-      return
-    }
     setLoading(true)
-    chatApi.searchParticipants(chatId, debouncedQuery)
+    const req = debouncedQuery.trim()
+      ? chatApi.searchParticipants(chatId, debouncedQuery)
+      : chatApi.getParticipants(chatId)
+    req
       .then(({ data }) => setParticipants(data))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [debouncedQuery, chatId])
+  }, [chatId, debouncedQuery, participantsRevision])
 
   useEffect(() => {
     if (!adding) return
@@ -220,19 +211,25 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
   }, [adding, debouncedInvite, participants])
 
   useEffect(() => {
+    setNewName(chatName)
+  }, [chatName])
+
+  useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  const handleSaveName = async () => {
-    if (!newName.trim() || savingName) return
+  const handleSaveName = () => {
+    const name = newName.trim()
+    if (!name || savingName) return
     setSavingName(true)
-    try {
-      await chatApi.updateChatName(chatId, newName.trim())
-      onChatUpdated(newName.trim(), chatAvatar)
+    const ok = wsSend({ event_type: 'chat_rename', new_chat_name: name })
+    if (ok) {
+      onChatUpdated(name, chatAvatar)
       setEditingName(false)
-    } catch { } finally { setSavingName(false) }
+    }
+    setSavingName(false)
   }
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,21 +242,20 @@ export default function GroupChatInfoModal({ chatId, chatName, chatAvatar, parti
     } catch { } finally { setUploadingAvatar(false) }
   }
 
-  const handleKick = async (userId: string) => {
-    try {
-      await chatApi.kickUser(chatId, userId)
-      setParticipants(prev => prev.filter(p => p.id !== userId))
-    } catch { }
+  const handleKick = (userId: string) => {
+    const ok = wsSend({ event_type: 'participant_kick', kicked_id: userId })
+    if (ok) setParticipants(prev => prev.filter(p => p.id !== userId))
   }
 
-  const handleInvite = async (profile: ProfileResponse) => {
+  const handleInvite = (profile: ProfileResponse) => {
     if (invitingId) return
     setInvitingId(profile.id)
-    try {
-      await chatApi.inviteUser(chatId, profile.id)
-      setParticipants(prev => [...prev, profile])
+    const ok = wsSend({ event_type: 'participant_add', invited_id: profile.id })
+    if (ok) {
+      setParticipants(prev => (prev.some(p => p.id === profile.id) ? prev : [...prev, profile]))
       setInviteResults(prev => prev.filter(p => p.id !== profile.id))
-    } catch { } finally { setInvitingId(null) }
+    }
+    setInvitingId(null)
   }
 
   return (

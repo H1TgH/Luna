@@ -106,3 +106,4 @@ class ParticipantKickedEvent(BaseModel):
 class ChatRenamedEvent(BaseModel):
     event_type: Literal["chat_renamed"] = "chat_renamed"
     new_chat_name: str
+    chat_id: UUID

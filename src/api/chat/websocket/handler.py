@@ -208,10 +208,25 @@ class WebSocketEventHandler:
             inviter_id=user_id,
         )
 
+        message_dto = MessageCreationDTO(
+            None,
+            chat_id,
+            f"{user_id} пригласил(а) {data.invited_id}",
+            MessageTypeEnum.SYSTEM
+        )
+        message = await self.chat_service.send_message(message_dto)
+        message_response = MessageCreatedEvent.model_validate(message)
+
         await self.connection_manager.broadcast(
             chat_id,
             response.model_dump(mode="json"),
         )
+
+        await self.connection_manager.broadcast(
+            chat_id,
+            message_response.model_dump(mode="json")
+        )
+
 
     async def handle_participant_kick(
         self,
@@ -230,9 +245,28 @@ class WebSocketEventHandler:
             initiator_id=user_id,
         )
 
+
+        if user_id == data.kicked_id:
+            system_message_content = f"{user_id} покинул(а) чат"
+        else:
+            system_message_content = f"{user_id} исключил(а) {data.kicked_id}"
+        message_dto = MessageCreationDTO(
+            None,
+            chat_id,
+            system_message_content,
+            MessageTypeEnum.SYSTEM
+        )
+        message = await self.chat_service.send_message(message_dto)
+        message_response = MessageCreatedEvent.model_validate(message)
+
         await self.connection_manager.broadcast(
             chat_id,
             response.model_dump(mode="json"),
+        )
+
+        await self.connection_manager.broadcast(
+            chat_id,
+            message_response.model_dump(mode="json")
         )
 
     async def handle_chat_rename(
@@ -248,9 +282,24 @@ class WebSocketEventHandler:
 
         response = ChatRenamedEvent(
             new_chat_name=data.new_chat_name,
+            chat_id=chat_id
         )
+
+        message_dto = MessageCreationDTO(
+            None,
+            chat_id,
+            f"{user_id} изменил название чата на {data.new_chat_name}",
+            MessageTypeEnum.SYSTEM
+        )
+        message = await self.chat_service.send_message(message_dto)
+        message_response = MessageCreatedEvent.model_validate(message)
 
         await self.connection_manager.broadcast(
             chat_id,
             response.model_dump(mode="json"),
+        )
+
+        await self.connection_manager.broadcast(
+            chat_id,
+            message_response.model_dump(mode="json")
         )

@@ -475,6 +475,7 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
       online_participants_count?: number | null
     } | null>(null)
   const [showGroupInfo, setShowGroupInfo] = useState(false)
+  const [participantsRevision, setParticipantsRevision] = useState(0)
   const [ownLastReadMsgId, setOwnLastReadMsgId] = useState<string | null>(null)
   const [peerLastReadMsgId, setPeerLastReadMsgId] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
@@ -560,6 +561,24 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
     },
     onChatRenamed: (name) => {
       setChatInfo(prev => prev ? { ...prev, name } : prev)
+    },
+    onParticipantAdded: () => {
+      setChatInfo(prev => prev ? {
+        ...prev,
+        participants_count: (prev.participants_count ?? 0) + 1,
+      } : prev)
+      setParticipantsRevision(v => v + 1)
+    },
+    onParticipantKicked: (kickedUserId) => {
+      if (String(kickedUserId) === String(myId)) {
+        navigate('/chats')
+        return
+      }
+      setChatInfo(prev => prev ? {
+        ...prev,
+        participants_count: Math.max(0, (prev.participants_count ?? 1) - 1),
+      } : prev)
+      setParticipantsRevision(v => v + 1)
     },
   })
   wsSendRef.current = wsSend
@@ -983,6 +1002,8 @@ function ChatWindow({ chatId, chat, myId, isMobile }: {
           chatName={headerName}
           chatAvatar={headerAvatar ?? null}
           participantsCount={chatInfo?.participants_count ?? null}
+          participantsRevision={participantsRevision}
+          wsSend={wsSend}
           onClose={() => setShowGroupInfo(false)}
           onChatUpdated={(name, avatarUrl) => {
             setChatInfo(prev => prev ? { ...prev, name, avatar_url: avatarUrl } : prev)
