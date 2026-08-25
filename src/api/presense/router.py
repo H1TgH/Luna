@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
-from core.auth.services import AuthService, get_auth_service
+from core.auth.entities import CurrentUserDTO
 from core.presense.services import PresenseService, get_presense_service
+from dependencies import get_ws_current_user
 
 
 presense_router = APIRouter(
@@ -13,22 +14,16 @@ presense_router = APIRouter(
 @presense_router.websocket("/ws")
 async def get_presense_status(
     websocket: WebSocket,
-    auth_service: AuthService = Depends(get_auth_service),
+    current_user: CurrentUserDTO = Depends(get_ws_current_user),
     presense_service: PresenseService = Depends(get_presense_service)
 ):
-    token = websocket.cookies.get("user_access_token", None)
-    payload = auth_service.verify_token(token, "access")
-    if not payload:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
-        return
-    user_id = payload.get("sub")
     await websocket.accept()
 
     try:
         while True:
             message = await websocket.receive_text()
             if message == "ping":
-                await presense_service.set_online(user_id)
+                await presense_service.set_online(current_user.id)
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
-        await presense_service.set_offline(user_id)
+        await presense_service.set_offline(current_user.id)

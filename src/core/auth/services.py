@@ -57,9 +57,6 @@ class AuthService:
         return LoginTokensDTO(access_token=access_token, refresh_token=refresh_token)
 
     def refresh(self, refresh_token: str | None) -> str:
-        if not refresh_token:
-            raise TokenIsMissingException("Refresh token is missing")
-
         user_id = self.get_user_id_from_token_or_raise(refresh_token, "refresh")
         return self.create_token(
             {"sub": user_id, "type": "access"},
@@ -137,7 +134,7 @@ class AuthService:
             settings.security.algorithm.get_secret_value()
         )
 
-    def get_user_id_from_token_or_raise(self, token: str, token_type: str) -> UUID:
+    def get_user_id_from_token_or_raise(self, token: str | None, token_type: str) -> UUID:
         payload = self.verify_token(token, token_type)
         return UUID(payload.get("sub"))
 
@@ -153,9 +150,9 @@ class AuthService:
                 algorithms=[settings.security.algorithm.get_secret_value()],
             )
         except ExpiredSignatureError as e:
-            raise InvalidTokenException("Token expired") from e
+            raise InvalidTokenException(f"{token_type} token expired") from e
         except JWTError as e:
-            raise InvalidTokenException("Invalid token") from e
+            raise InvalidTokenException(f"Invalid {token_type} token") from e
 
         if payload.get("type") != token_type:
             raise InvalidTokenException("Invalid token type")

@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, WebSocket, status
 from fastapi.security import APIKeyCookie
 
 from core.auth.entities import CurrentUserDTO
@@ -27,3 +27,18 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         ) from e
+
+
+async def get_ws_current_user(
+    websocket: WebSocket,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> CurrentUserDTO:
+    try:
+        token = websocket.cookies.get("user_access_token", None)
+        return await auth_service.get_current_user(token)
+    except (InvalidTokenException, EmailNotConfirmedException, UserDoesNotExistException) as e:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason=str(e)
+        )
+        raise
