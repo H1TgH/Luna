@@ -6,12 +6,12 @@ import redis.asyncio as redis
 from settings import settings
 
 
-class PresenseRepository:
+class PresenceRepository:
     def __init__(self) -> None:
         self.redis_client = redis.Redis(
             host=settings.redis.host,
             port=settings.redis.port,
-            db=settings.redis.presense_db
+            db=settings.redis.presence_db
         )
 
     async def set_online(self, user_id: UUID) -> None:

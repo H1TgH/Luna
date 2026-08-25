@@ -4,7 +4,7 @@ from uuid import UUID
 
 
 @dataclass
-class PresenseReadDTO:
+class PresenceReadDTO:
     user_id: UUID
     is_online: bool
     last_seen: datetime | None

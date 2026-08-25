@@ -1,30 +1,30 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from core.presense.entities import PresenseReadDTO
+from core.presence.entities import PresenceReadDTO
 from infrastructure.database.repositories.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
-from infrastructure.presense.repository import PresenseRepository
+from infrastructure.presence.repository import PresenceRepository
 
 
-class PresenseService:
+class PresenceService:
     def __init__(self, uow: UnitOfWork) -> None:
-        self.presense_repository = PresenseRepository()
+        self.presence_repository = PresenceRepository()
         self.uow = uow
 
     async def set_online(self, user_id: UUID) -> None:
-        await self.presense_repository.set_online(user_id)
+        await self.presence_repository.set_online(user_id)
         await self._update_last_seen(user_id)
 
     async def set_offline(self, user_id: UUID) -> None:
-        await self.presense_repository.set_offline(user_id)
+        await self.presence_repository.set_offline(user_id)
         await self._update_last_seen(user_id)
 
-    async def get_presense(self, user_id: UUID) -> PresenseReadDTO:
-        is_online = await self.presense_repository.is_online(user_id)
-        last_seen = await self.presense_repository.get_last_seen(user_id)
+    async def get_presence(self, user_id: UUID) -> PresenceReadDTO:
+        is_online = await self.presence_repository.is_online(user_id)
+        last_seen = await self.presence_repository.get_last_seen(user_id)
 
-        dto = PresenseReadDTO(
+        dto = PresenceReadDTO(
             user_id=user_id,
             is_online=is_online,
             last_seen=last_seen
@@ -40,5 +40,5 @@ class PresenseService:
             await repository.update_last_seen(user_id, current_time)
 
 
-def get_presense_service() -> PresenseService:
-    return PresenseService(UnitOfWork())
+def get_presence_service() -> PresenceService:
+    return PresenceService(UnitOfWork())

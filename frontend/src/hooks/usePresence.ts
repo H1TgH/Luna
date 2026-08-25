@@ -40,7 +40,7 @@ export function usePresence() {
       cleanupSocket()
 
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const url = `${proto}://${window.location.host}/api/v1/presense/ws`
+      const url = `${proto}://${window.location.host}/api/v1/presence/ws`
       const ws = new WebSocket(url)
       wsRef.current = ws
 

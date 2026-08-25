@@ -23,7 +23,7 @@ from infrastructure.database.repositories.chat import ChatRepository
 from infrastructure.database.repositories.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
 from infrastructure.media.images.processor import ImageProcessor
-from infrastructure.presense.repository import PresenseRepository
+from infrastructure.presence.repository import PresenceRepository
 from infrastructure.s3.storage import S3Storage
 from settings import settings
 
@@ -140,7 +140,7 @@ class ChatService:
     ) -> MessageHistoryDTO:
         async with self.uow() as session:
             chat_repo = ChatRepository(session)
-            presense_repo = PresenseRepository()
+            presence_repo = PresenceRepository()
 
             await self._check_user_is_participant_or_raise(chat_repo, chat_id, current_user_id)
 
@@ -152,7 +152,7 @@ class ChatService:
             if chat.is_group:
                 chat_dto.name = chat.name
                 chat_dto.avatar_url = self._build_chat_avatar_url(chat.avatar_key)
-                counts = await self._get_chat_participants_count(chat_repo, presense_repo, chat_id)
+                counts = await self._get_chat_participants_count(chat_repo, presence_repo, chat_id)
                 chat_dto.participants_count = counts[0]
                 chat_dto.online_participants_count = counts[1]
             else:
@@ -161,8 +161,8 @@ class ChatService:
                 chat_dto.name = interlocutor.full_name
                 chat_dto.avatar_url = self._build_avatar_url(interlocutor.avatar_key)
                 chat_dto.username = interlocutor.username
-                chat_dto.is_online = await presense_repo.is_online(interlocutor.id)
-                chat_dto.last_seen = await presense_repo.get_last_seen(interlocutor.id)
+                chat_dto.is_online = await presence_repo.is_online(interlocutor.id)
+                chat_dto.last_seen = await presence_repo.get_last_seen(interlocutor.id)
 
             own_last_read_message_id = await chat_repo.get_last_read_message_id(chat_id, current_user_id)
             peer_last_read_message_id = await chat_repo.get_peer_last_read_message_id(chat_id, current_user_id)
@@ -185,7 +185,7 @@ class ChatService:
     async def _get_chat_participants_count(
         self,
         chat_repo: ChatRepository,
-        presense_repo: PresenseRepository,
+        presence_repo: PresenceRepository,
         chat_id: UUID
     ) -> tuple[int, int]:
         participants_ids = await chat_repo.get_chat_participants_ids(chat_id)
@@ -194,7 +194,7 @@ class ChatService:
         online_count = 0
 
         for pid in participants_ids:
-            status = await presense_repo.is_online(pid)
+            status = await presence_repo.is_online(pid)
             if status:
                 online_count += 1
 
