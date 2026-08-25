@@ -59,7 +59,7 @@ class AuthService:
     def refresh(self, refresh_token: str | None) -> str:
         user_id = self.get_user_id_from_token_or_raise(refresh_token, "refresh")
         return self.create_token(
-            {"sub": user_id, "type": "access"},
+            {"sub": str(user_id), "type": "access"},
             timedelta(minutes=settings.security.access_ttl)
         )
 

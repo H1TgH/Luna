@@ -12,7 +12,8 @@ from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.auth.services import AuthService, get_auth_service
-from core.posts.services import PostService, get_post_service
+from core.posts.services.post import PostService, get_post_service
+from core.posts.services.comment import CommentService, get_comment_service
 from core.profile.services import ProfileService, get_profile_service
 from infrastructure.database.models.posts import PostModel
 from infrastructure.database.models.profile import ProfileModel
@@ -123,14 +124,22 @@ def test_post_service(db_session: AsyncSession, s3_posts: S3Storage) -> PostServ
 
 
 @pytest.fixture
+def test_comment_service(db_session: AsyncSession, s3_posts: S3Storage) -> CommentService:
+    uow = TestUnitOfWork(db_session)
+    return PostService(uow=uow, s3_storage=s3_posts, image_processor=ImageProcessor())
+
+
+@pytest.fixture
 async def client(
     test_auth_service: AuthService,
     test_profile_service: ProfileService,
     test_post_service: PostService,
+    test_comment_service: CommentService,
 ) -> AsyncGenerator[AsyncClient]:
     app.dependency_overrides[get_auth_service] = lambda: test_auth_service
     app.dependency_overrides[get_profile_service] = lambda: test_profile_service
     app.dependency_overrides[get_post_service] = lambda: test_post_service
+    app.dependency_overrides[get_comment_service] = lambda: test_comment_service
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
@@ -247,16 +256,33 @@ def post_factory(db_session: AsyncSession) -> Callable[..., PostModel]:
 
 
 @pytest.fixture
-def auth_header_factory(test_auth_service: AuthService) -> Callable[[UserModel], dict[str, str]]:
-    def _create_auth_header(user: UserModel) -> dict[str, str]:
-        token = test_auth_service.create_token(
-            {"sub": str(user.id), "type": "access"},
-            expires_delta=timedelta(settings.security.access_ttl),
+def auth_cookie_factory(
+    client: AsyncClient,
+    test_auth_service: AuthService,
+    test_user: UserModel,
+) -> Callable[..., None]:
+    def _create_auth_cookies(
+        user_id: UUID | None = None,
+        access_type: str = "access",
+        access_exp: int = settings.security.access_ttl,
+        refresh_type: str = "refresh",
+        refresh_exp: int = settings.security.refresh_ttl,
+    ) -> None:
+        user_id = user_id or test_user.id
+
+        access_token = test_auth_service.create_token(
+            {"sub": str(user_id), "type": access_type},
+            expires_delta=timedelta(minutes=access_exp),
+        )
+        refresh_token = test_auth_service.create_token(
+            {"sub": str(user_id), "type": refresh_type},
+            expires_delta=timedelta(days=refresh_exp),
         )
 
-        return {"Authorization": token}
+        client.cookies.set("user_access_token", access_token)
+        client.cookies.set("user_refresh_token", refresh_token)
 
-    return _create_auth_header
+    return _create_auth_cookies
 
 
 @pytest.fixture
@@ -270,5 +296,8 @@ async def test_profile(test_user: UserModel, profile_factory: Callable[..., Prof
 
 
 @pytest.fixture
-def auth_header(test_user: UserModel, auth_header_factory: Callable[[UserModel], dict[str, str]]) -> dict[str, str]:
-    return auth_header_factory(test_user)
+def auth_cookie(
+    test_user: UserModel,
+    auth_cookie_factory: Callable[[UserModel], None],
+) -> None:
+    auth_cookie_factory(test_user.id)

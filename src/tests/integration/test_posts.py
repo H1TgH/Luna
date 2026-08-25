@@ -15,12 +15,12 @@ from infrastructure.database.models.users import UserModel
 async def test_create_post_with_content(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     response: Response = await client.post(
         "/api/v1/posts/",
         data={"content": "Hello world"},
-        headers=auth_header
+        headers=auth_cookie
     )
 
     assert response.status_code == http.HTTPStatus.CREATED
@@ -30,13 +30,13 @@ async def test_create_post_with_content(
 async def test_create_post_with_image(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes
 ):
     response: Response = await client.post(
         "/api/v1/posts/",
         files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
-        headers=auth_header
+        headers=auth_cookie
     )
 
     assert response.status_code == http.HTTPStatus.CREATED
@@ -46,14 +46,14 @@ async def test_create_post_with_image(
 async def test_create_post_with_content_and_images(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes
 ):
     response: Response = await client.post(
         "/api/v1/posts/",
         data={"content": "Post with images"},
         files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
-        headers=auth_header
+        headers=auth_cookie
     )
 
     assert response.status_code == http.HTTPStatus.CREATED
@@ -63,7 +63,7 @@ async def test_create_post_with_content_and_images(
 async def test_create_post_with_multiple_images(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes
 ):
     images = [
@@ -74,7 +74,7 @@ async def test_create_post_with_multiple_images(
     response: Response = await client.post(
         "/api/v1/posts/",
         files=images,
-        headers=auth_header
+        headers=auth_cookie
     )
 
     assert response.status_code == http.HTTPStatus.CREATED
@@ -84,7 +84,7 @@ async def test_create_post_with_multiple_images(
 async def test_create_post_with_max_images(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes
 ):
     images = [
@@ -95,7 +95,7 @@ async def test_create_post_with_max_images(
     response: Response = await client.post(
         "/api/v1/posts/",
         files=images,
-        headers=auth_header
+        headers=auth_cookie
     )
 
     assert response.status_code == http.HTTPStatus.CREATED
@@ -105,7 +105,7 @@ async def test_create_post_with_max_images(
 async def test_create_post_with_too_many_images(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes
 ):
     images = [
@@ -116,7 +116,7 @@ async def test_create_post_with_too_many_images(
     response: Response = await client.post(
         "/api/v1/posts/",
         files=images,
-        headers=auth_header
+        headers=auth_cookie
     )
 
     assert response.status_code == http.HTTPStatus.BAD_REQUEST
@@ -126,11 +126,11 @@ async def test_create_post_with_too_many_images(
 async def test_create_post_without_content_and_images(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     response: Response = await client.post(
         "/api/v1/posts/",
-        headers=auth_header
+        headers=auth_cookie
     )
 
     assert response.status_code == http.HTTPStatus.BAD_REQUEST
@@ -154,11 +154,11 @@ async def test_get_post(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert response.json()["id"] == str(post.id)
@@ -171,11 +171,11 @@ async def test_get_post_likes_count_initial(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert response.json()["likes_count"] == 0
@@ -187,12 +187,12 @@ async def test_get_post_is_current_user_likes_true(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
-    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
-    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/{post.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert response.json()["likes_count"] == 1
@@ -203,9 +203,9 @@ async def test_get_post_is_current_user_likes_true(
 async def test_get_post_not_found(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
-    response: Response = await client.get(f"/api/v1/posts/{uuid4()}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/{uuid4()}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.NOT_FOUND
 
@@ -227,9 +227,9 @@ async def test_get_post_unauthorized(
 async def test_get_my_posts_empty(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
-    response: Response = await client.get("/api/v1/posts/me", headers=auth_header)
+    response: Response = await client.get("/api/v1/posts/me", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert response.json()["posts"] == []
@@ -242,12 +242,12 @@ async def test_get_my_posts(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     await post_factory(author_id=test_profile.id)
     await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.get("/api/v1/posts/me", headers=auth_header)
+    response: Response = await client.get("/api/v1/posts/me", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert len(response.json()["posts"]) == 2
@@ -258,12 +258,12 @@ async def test_get_my_posts_pagination(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     for _ in range(3):
         await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.get("/api/v1/posts/me", params={"limit": 2}, headers=auth_header)
+    response: Response = await client.get("/api/v1/posts/me", params={"limit": 2}, headers=auth_cookie)
 
     data = response.json()
     assert response.status_code == http.HTTPStatus.OK
@@ -283,7 +283,7 @@ async def test_get_my_posts_unauthorized(client: AsyncClient):
 async def test_get_user_posts(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     user_factory: Callable,
     profile_factory: Callable,
     post_factory: Callable
@@ -293,7 +293,7 @@ async def test_get_user_posts(
     await post_factory(author_id=other_profile.id)
     await post_factory(author_id=other_profile.id)
 
-    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert len(response.json()["posts"]) == 2
@@ -303,14 +303,14 @@ async def test_get_user_posts(
 async def test_get_user_posts_empty(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     user_factory: Callable,
     profile_factory: Callable
 ):
     other_user: UserModel = await user_factory(email="other@example.com")
     other_profile: ProfileModel = await profile_factory(user_id=other_user.id, username="other")
 
-    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert response.json()["posts"] == []
@@ -321,7 +321,7 @@ async def test_get_user_posts_does_not_return_other_users_posts(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     user_factory: Callable,
     profile_factory: Callable
 ):
@@ -330,7 +330,7 @@ async def test_get_user_posts_does_not_return_other_users_posts(
     await post_factory(author_id=test_profile.id)
     await post_factory(author_id=other_profile.id)
 
-    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_header)
+    response: Response = await client.get(f"/api/v1/posts/user/{other_profile.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
     assert len(response.json()["posts"]) == 1
@@ -351,11 +351,11 @@ async def test_delete_post(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.delete(f"/api/v1/posts/{post.id}", headers=auth_header)
+    response: Response = await client.delete(f"/api/v1/posts/{post.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.NO_CONTENT
 
@@ -364,9 +364,9 @@ async def test_delete_post(
 async def test_delete_post_not_found(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
-    response: Response = await client.delete(f"/api/v1/posts/{uuid4()}", headers=auth_header)
+    response: Response = await client.delete(f"/api/v1/posts/{uuid4()}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.NOT_FOUND
 
@@ -376,7 +376,7 @@ async def test_delete_post_forbidden(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     user_factory: Callable,
     profile_factory: Callable
 ):
@@ -384,7 +384,7 @@ async def test_delete_post_forbidden(
     other_profile: ProfileModel = await profile_factory(user_id=other_user.id, username="other")
     post: PostModel = await post_factory(author_id=other_profile.id)
 
-    response: Response = await client.delete(f"/api/v1/posts/{post.id}", headers=auth_header)
+    response: Response = await client.delete(f"/api/v1/posts/{post.id}", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.FORBIDDEN
 
@@ -407,11 +407,11 @@ async def test_put_like(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    response: Response = await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
 
@@ -420,9 +420,9 @@ async def test_put_like(
 async def test_put_like_not_found(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
-    response: Response = await client.post(f"/api/v1/posts/{uuid4()}/like", headers=auth_header)
+    response: Response = await client.post(f"/api/v1/posts/{uuid4()}/like", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.NOT_FOUND
 
@@ -432,12 +432,12 @@ async def test_put_like_idempotent(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
 
-    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
-    response: Response = await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
+    response: Response = await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
 
@@ -460,19 +460,19 @@ async def test_remove_like(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
-    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
-    response: Response = await client.delete(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    response: Response = await client.delete(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
 
 
 @pytest.mark.asyncio
-async def test_remove_like_not_found(client: AsyncClient, test_profile: ProfileModel, auth_header: dict[str, str]):
-    response: Response = await client.delete(f"/api/v1/posts/{uuid4()}/like", headers=auth_header)
+async def test_remove_like_not_found(client: AsyncClient, test_profile: ProfileModel, auth_cookie: dict[str, str]):
+    response: Response = await client.delete(f"/api/v1/posts/{uuid4()}/like", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.NOT_FOUND
 
@@ -482,11 +482,11 @@ async def test_remove_like_idempotent(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.delete(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    response: Response = await client.delete(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
     assert response.status_code == http.HTTPStatus.OK
 
@@ -509,11 +509,11 @@ async def test_likes_count_initial(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     await post_factory(author_id=test_profile.id)
 
-    response: Response = await client.get("/api/v1/posts/me", headers=auth_header)
+    response: Response = await client.get("/api/v1/posts/me", headers=auth_cookie)
 
     post = response.json()["posts"][0]
     assert post["likes_count"] == 0
@@ -525,12 +525,12 @@ async def test_is_current_user_likes_true(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
-    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
-    response: Response = await client.get("/api/v1/posts/me", headers=auth_header)
+    response: Response = await client.get("/api/v1/posts/me", headers=auth_cookie)
 
     post_data = response.json()["posts"][0]
     assert post_data["likes_count"] == 1
@@ -542,13 +542,13 @@ async def test_is_current_user_likes_false_after_remove(
     client: AsyncClient,
     test_profile: ProfileModel,
     post_factory: Callable,
-    auth_header: dict[str, str]
+    auth_cookie: dict[str, str]
 ):
     post: PostModel = await post_factory(author_id=test_profile.id)
-    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_header)
-    await client.delete(f"/api/v1/posts/{post.id}/like", headers=auth_header)
+    await client.post(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
+    await client.delete(f"/api/v1/posts/{post.id}/like", headers=auth_cookie)
 
-    response: Response = await client.get("/api/v1/posts/me", headers=auth_header)
+    response: Response = await client.get("/api/v1/posts/me", headers=auth_cookie)
 
     post_data = response.json()["posts"][0]
     assert post_data["likes_count"] == 0
@@ -559,11 +559,11 @@ async def test_is_current_user_likes_false_after_remove(
 async def test_get_user_images_empty(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
 ):
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -574,18 +574,18 @@ async def test_get_user_images_empty(
 async def test_get_user_images_after_post_with_image(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes,
 ):
     await client.post(
         "/api/v1/posts/",
         files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -596,17 +596,17 @@ async def test_get_user_images_after_post_with_image(
 async def test_get_user_images_text_only_post_not_included(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
 ):
     await client.post(
         "/api/v1/posts/",
         data={"content": "no images here"},
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -617,18 +617,18 @@ async def test_get_user_images_text_only_post_not_included(
 async def test_get_user_images_multiple_images_in_one_post(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes,
 ):
     images = [
         ("images", (f"photo{i}.jpg", fake_image_bytes, "image/jpeg"))
         for i in range(3)
     ]
-    await client.post("/api/v1/posts/", files=images, headers=auth_header)
+    await client.post("/api/v1/posts/", files=images, headers=auth_cookie)
 
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -639,19 +639,19 @@ async def test_get_user_images_multiple_images_in_one_post(
 async def test_get_user_images_multiple_posts(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes,
 ):
     for _ in range(2):
         await client.post(
             "/api/v1/posts/",
             files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
-            headers=auth_header,
+            headers=auth_cookie,
         )
 
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -662,15 +662,15 @@ async def test_get_user_images_multiple_posts(
 async def test_get_user_images_does_not_return_other_users_images(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     user_factory: Callable[..., UserModel],
     profile_factory: Callable[..., ProfileModel],
-    auth_header_factory: Callable[[UserModel], dict[str, str]],
+    auth_cookie_factory: Callable[[UserModel], dict[str, str]],
     fake_image_bytes: bytes,
 ):
     other_user: UserModel = await user_factory(email="other@example.com")
     await profile_factory(user_id=other_user.id, username="otheruser")
-    other_header: dict[str, str] = auth_header_factory(other_user)
+    other_header: dict[str, str] = auth_cookie_factory(other_user.id)
 
     await client.post(
         "/api/v1/posts/",
@@ -680,7 +680,7 @@ async def test_get_user_images_does_not_return_other_users_images(
 
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -691,18 +691,18 @@ async def test_get_user_images_does_not_return_other_users_images(
 async def test_get_user_images_response_schema(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes,
 ):
     await client.post(
         "/api/v1/posts/",
         files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -716,20 +716,20 @@ async def test_get_user_images_response_schema(
 async def test_get_user_images_pagination_limit(
     client: AsyncClient,
     test_profile: ProfileModel,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
     fake_image_bytes: bytes,
 ):
     for _ in range(5):
         await client.post(
             "/api/v1/posts/",
             files={"images": ("photo.jpg", fake_image_bytes, "image/jpeg")},
-            headers=auth_header,
+            headers=auth_cookie,
         )
 
     response = await client.get(
         f"/api/v1/posts/images/{test_profile.id}",
         params={"limit": 2},
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -749,11 +749,11 @@ async def test_get_user_images_unauthorized(
 @pytest.mark.asyncio
 async def test_get_user_images_nonexistent_profile(
     client: AsyncClient,
-    auth_header: dict[str, str],
+    auth_cookie: dict[str, str],
 ):
     response = await client.get(
         f"/api/v1/posts/images/{uuid4()}",
-        headers=auth_header,
+        headers=auth_cookie,
     )
 
     assert response.status_code == HTTPStatus.OK

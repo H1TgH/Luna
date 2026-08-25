@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from core.auth.exceptions import (
     InvalidCredentialsException,
     InvalidTokenException,
+    TokenIsMissingException,
     UserAlreadyExistsException,
     UserDoesNotExistException,
 )
@@ -20,7 +21,7 @@ def handle_auth_exceptions(func):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e)
             ) from e
-        except (InvalidCredentialsException, InvalidTokenException) as e:
+        except (InvalidCredentialsException, InvalidTokenException, TokenIsMissingException) as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=str(e)

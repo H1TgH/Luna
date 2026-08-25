@@ -161,23 +161,16 @@ async def test_confirm_email_expired_token(
 @pytest.mark.asyncio
 async def test_refresh_token(
     client: AsyncClient,
-    test_auth_service,
-    test_user: UserModel,
+    auth_cookie
 ):
-    refresh_token = test_auth_service.create_token(
-        {"sub": str(test_user.id), "type": "refresh"},
-        expires_delta=timedelta(days=7),
-    )
-
-    response = await client.post("/api/v1/users/auth/refresh", json={"token": refresh_token})
+    response = await client.post("/api/v1/users/auth/refresh")
 
     assert response.status_code == HTTPStatus.OK
-    assert "token" in response.json()
 
 
 @pytest.mark.asyncio
 async def test_refresh_token_invalid(client: AsyncClient):
-    response = await client.post("/api/v1/users/auth/refresh", json={"token": "invalid_token"})
+    response = await client.post("/api/v1/users/auth/refresh", cookies={"user_refresh_token": "invalid_token"})
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
@@ -185,15 +178,11 @@ async def test_refresh_token_invalid(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_refresh_token_wrong_type(
     client: AsyncClient,
-    test_auth_service,
-    test_user: UserModel,
+    auth_cookie_factory
 ):
-    token = test_auth_service.create_token(
-        {"sub": str(test_user.id), "type": "access"},
-        expires_delta=timedelta(minutes=30),
-    )
+    auth_cookie_factory(refresh_type="invalide_type")
 
-    response = await client.post("/api/v1/users/auth/refresh", json={"token": token})
+    response = await client.post("/api/v1/users/auth/refresh")
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
@@ -201,24 +190,20 @@ async def test_refresh_token_wrong_type(
 @pytest.mark.asyncio
 async def test_refresh_token_expired(
     client: AsyncClient,
-    test_auth_service,
-    test_user: UserModel,
+    auth_cookie_factory
 ):
-    token = test_auth_service.create_token(
-        {"sub": str(test_user.id), "type": "refresh"},
-        expires_delta=timedelta(seconds=-1),
-    )
+    auth_cookie_factory(refresh_exp=-1)
 
-    response = await client.post("/api/v1/users/auth/refresh", json={"token": token})
+    response = await client.post("/api/v1/users/auth/refresh")
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.asyncio
 async def test_refresh_token_missing_field(client: AsyncClient):
-    response = await client.post("/api/v1/users/auth/refresh", json={})
+    response = await client.post("/api/v1/users/auth/refresh")
 
-    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.asyncio
