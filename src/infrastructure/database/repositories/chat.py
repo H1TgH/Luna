@@ -9,13 +9,11 @@ from core.chat.entities import (
     ChatCreationDTO,
     ChatDTO,
     MessageCreationDTO,
-    MessageDTO,
-    MessageSenderDTO,
     MessageUpdateDTO,
 )
+from infrastructure.database.mapper.chat import ChatMapper
 from infrastructure.database.models.chat import ChatModel, ChatParticipantModel, MessageModel
 from infrastructure.database.models.profile import ProfileModel
-from settings import settings
 
 
 class ChatRepository:
@@ -140,7 +138,7 @@ class ChatRepository:
         rows = result.all()
 
         return [
-            self._build_chat_dto(
+            ChatMapper().build_chat_dto(
                 chat,
                 message,
                 sender,
@@ -175,7 +173,7 @@ class ChatRepository:
         chat_id: UUID,
         limit: int = 50,
         cursor: datetime | None = None
-    ) -> list[MessageDTO]:
+    ) -> list[tuple[MessageModel, ProfileModel]]:
         stmt = (
             select(MessageModel, ProfileModel)
             .outerjoin(ProfileModel, MessageModel.sender_id == ProfileModel.id)
@@ -190,10 +188,7 @@ class ChatRepository:
         result = await self.session.execute(stmt)
         rows = result.all()
 
-        return [
-            self._build_message_dto(message, sender)
-            for message, sender in rows
-        ]
+        return rows
 
     async def check_user_is_participant(
         self,
@@ -359,59 +354,3 @@ class ChatRepository:
             user_id=user_id
         )
         self.session.add(participant)
-
-    @staticmethod
-    def _build_chat_dto(
-        chat: ChatModel,
-        message: MessageModel | None,
-        sender: ProfileModel | None,
-        unread_count: int,
-        has_unread: bool
-    ) -> ChatDTO:
-        return ChatDTO(
-            id=chat.id,
-            is_group=chat.is_group,
-            name=chat.name,
-            avatar_url=chat.avatar_key,
-            last_message=MessageDTO(
-                id=message.id,
-                content=message.content,
-                type=message.type,
-                sender=MessageSenderDTO(
-                    sender_id=sender.id,
-                    username=sender.username,
-                    first_name=sender.first_name,
-                    last_name=sender.last_name,
-                    avatar_key=sender.avatar_key
-                ) if sender else None,
-                created_at=message.created_at,
-                is_deleted=message.is_deleted,
-                is_edited=message.is_edited,
-                edited_at=message.edited_at
-            ) if message else None,
-            unread_count=unread_count,
-            is_mark_unread=has_unread,
-            created_at=chat.created_at,
-        )
-
-    @staticmethod
-    def _build_message_dto(
-        message: MessageModel,
-        sender: ProfileModel | None
-    ):
-        return MessageDTO(
-            id=message.id,
-            sender=MessageSenderDTO(
-                sender_id=sender.id,
-                username=sender.username,
-                first_name=sender.first_name,
-                last_name=sender.last_name,
-                avatar_key=f"{settings.s3.public_endpoint}/media/avatars/{sender.avatar_key}"
-            ) if sender else None,
-            content=message.content,
-            type=message.type,
-            is_edited=message.is_edited,
-            is_deleted=message.is_deleted,
-            created_at=message.created_at,
-            edited_at=message.edited_at
-        )

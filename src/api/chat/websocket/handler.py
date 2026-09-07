@@ -227,7 +227,6 @@ class WebSocketEventHandler:
             message_response.model_dump(mode="json")
         )
 
-
     async def handle_participant_kick(
         self,
         chat_id: UUID,
@@ -244,7 +243,6 @@ class WebSocketEventHandler:
             kicked_user_id=data.kicked_id,
             initiator_id=user_id,
         )
-
 
         if user_id == data.kicked_id:
             system_message_content = f"{user_id} покинул(а) чат"

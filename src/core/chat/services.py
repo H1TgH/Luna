@@ -1,4 +1,5 @@
 import asyncio
+import re
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -11,14 +12,12 @@ from core.chat.entities import (
     MessageCreationDTO,
     MessageDTO,
     MessageHistoryDTO,
-    MessageSenderDTO,
     MessageUpdateDTO,
 )
 from core.chat.enums import MessageTypeEnum
 from core.chat.exceptions import InvalidParticipantsCountException
 from core.exceptions import PermissionDeniedException
-from infrastructure.database.models.chat import ChatModel, MessageModel
-from infrastructure.database.models.profile import ProfileModel
+from infrastructure.database.mapper.chat import ChatMapper
 from infrastructure.database.repositories.chat import ChatRepository
 from infrastructure.database.repositories.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
@@ -33,11 +32,13 @@ class ChatService:
         self,
         uow: UnitOfWork,
         s3_storage: S3Storage,
-        image_processor: ImageProcessor
+        image_processor: ImageProcessor,
+        mapper: ChatMapper
     ) -> None:
         self.uow = uow
         self.s3 = s3_storage
         self.image_processor = image_processor
+        self.mapper = mapper
 
     async def create_chat(
         self,
@@ -57,9 +58,9 @@ class ChatService:
                     raise InvalidParticipantsCountException("Only 2 participants can be in a private chat")
                 existing = await repo.get_personal_chat(all_users)
                 if existing:
-                    return self._build_chat_dto(existing, None, None, None, 0, False)
-            object_key = None
+                    return self.mapper._build_chat_dto(existing, None, None, None, 0, False)
 
+            object_key = None
             if data.is_group:
                 data.creator_id = creator_id
                 if chat_avatar is not None:
@@ -71,16 +72,16 @@ class ChatService:
 
             if data.is_group:
                 creator = await profile_repo.get_by_user_id(creator_id)
-                message_dto = MessageCreationDTO(
+                message_dto = self.mapper.build_message_creation_dto(
                     None,
                     chat.id,
-                    f"Пользователь {creator.full_name} создал чат {data.name}",
+                    f"Пользователь {creator.id} создал чат {data.name}",
                     MessageTypeEnum.SYSTEM
                 )
                 message = await repo.create_message(message_dto)
                 await repo.update_chat_last_message(chat.id, message.id)
 
-            return self._build_chat_dto(chat, None, None, None, 0, False)
+            return self.mapper._build_chat_dto(chat, None, None, None, 0, False)
 
     async def get_user_chats(
         self,
@@ -126,14 +127,10 @@ class ChatService:
             message = await chat_repo.create_message(message_data)
             sender = await profile_repo.get_by_user_id(message_data.sender_id)
 
-            avatar_url = None
-            if sender:
-                avatar_url = self._build_avatar_url(sender.avatar_key)
-
             await chat_repo.update_chat_last_message(message.chat_id, message.id)
             await chat_repo.mark_as_read(message_data.chat_id, message_data.sender_id, message.id)
 
-            return self._build_message_dto(message, sender, avatar_url)
+            return self.mapper.build_message_dto(message, sender)
 
     async def get_chat_history(
         self,
@@ -144,6 +141,7 @@ class ChatService:
     ) -> MessageHistoryDTO:
         async with self.uow() as session:
             chat_repo = ChatRepository(session)
+            profile_repo = ProfileRepository(session)
             presence_repo = PresenceRepository()
 
             await self._check_user_is_participant_or_raise(chat_repo, chat_id, current_user_id)
@@ -172,13 +170,37 @@ class ChatService:
             peer_last_read_message_id = await chat_repo.get_peer_last_read_message_id(chat_id, current_user_id)
 
             messages = await chat_repo.get_chat_history(chat_id, limit + 1, cursor)
+
             has_next = len(messages) > limit
             messages = messages[:limit]
-            next_cursor = messages[-1].created_at if messages else None
+            next_cursor = messages[-1][0].created_at if messages else None
+
+            messages_response = []
+            profiles_response = set()
+
+            for message, profile in messages:
+                if message.type != MessageTypeEnum.SYSTEM:
+                    messages_response.append(self.mapper.build_message_dto(message, profile.id))
+                    profiles_response.add(self.mapper._build_message_sender_dto(profile))
+                else:
+                    messages_response.append(self.mapper.build_message_dto(message, None))
+
+                    profile_ids = re.findall(
+                        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}",
+                        message.content
+                    )
+                    profiles = await asyncio.gather(
+                        *[profile_repo.get_by_user_id(profile_id) for profile_id in profile_ids]
+                    )
+                    profiles_response.update(
+                        self.mapper._build_message_sender_dto(profile)
+                        for profile in profiles
+                    )
 
             return MessageHistoryDTO(
                 chat=chat_dto,
-                messages=messages,
+                messages=messages_response,
+                profiles=profiles_response,
                 last_read_message_id=own_last_read_message_id,
                 own_last_read_message_id=own_last_read_message_id,
                 peer_last_read_message_id=peer_last_read_message_id,
@@ -255,7 +277,7 @@ class ChatService:
 
             user = await profile_repo.get_by_user_id(user_id)
             inviter = await profile_repo.get_by_user_id(inviter_id)
-            message_dto = MessageCreationDTO(
+            message_dto = self.mapper.build_message_creation_dto(
                 None,
                 chat_id,
                 f"{inviter.full_name} пригласил(а) {user.full_name}",
@@ -276,7 +298,7 @@ class ChatService:
 
             sender = await profile_repo.get_by_user_id(current_user_id)
             avatar_url = self._build_avatar_url(sender.avatar_key)
-            return self._build_message_dto(updated_message, sender, avatar_url)
+            return self.mapper._build_message_dto(updated_message, sender, avatar_url)
 
     async def mark_as_read(
         self,
@@ -318,7 +340,7 @@ class ChatService:
                 system_message_content = f"{initiator.full_name} покинул(а) чат"
             else:
                 system_message_content = f"{initiator.full_name} исключил(а) {user.full_name}"
-            message_dto = MessageCreationDTO(
+            message_dto = self.mapper.build_message_creation_dto(
                 None,
                 chat.id,
                 system_message_content,
@@ -328,61 +350,6 @@ class ChatService:
             await chat_repo.update_chat_last_message(chat.id, message.id)
 
             await chat_repo.delete_user_from_chat(chat_id, user_id)
-
-    def _build_chat_dto(
-        self,
-        chat: ChatModel,
-        message: MessageModel | None,
-        sender: ProfileModel | None,
-        sender_avatar: str | None,
-        unread_count: int,
-        has_unread: bool
-    ) -> ChatDTO:
-        return ChatDTO(
-            id=chat.id,
-            is_group=chat.is_group,
-            name=chat.name,
-            avatar_url=chat.avatar_key,
-            last_message=MessageDTO(
-                id=message.id,
-                content=message.content,
-                sender=MessageSenderDTO(
-                    sender_id=sender.id,
-                    username=sender.username,
-                    first_name=sender.first_name,
-                    last_name=sender.last_name,
-                    avatar_key=sender_avatar
-                ),
-                created_at=message.created_at,
-                is_deleted=message.is_deleted,
-            ) if message else None,
-            unread_count=unread_count,
-            is_mark_unread=has_unread,
-            created_at=chat.created_at,
-        )
-
-    @staticmethod
-    def _build_message_dto(
-        message: MessageModel,
-        sender: ProfileModel | None,
-        avatar_url: str | None
-    ):
-        return MessageDTO(
-            id=message.id,
-            sender=MessageSenderDTO(
-                sender_id=sender.id,
-                username=sender.username,
-                first_name=sender.first_name,
-                last_name=sender.last_name,
-                avatar_key=avatar_url
-            ) if sender else None,
-            content=message.content,
-            type=message.type,
-            is_edited=message.is_edited,
-            is_deleted=message.is_deleted,
-            created_at=message.created_at,
-            edited_at=message.edited_at
-        )
 
     @staticmethod
     def _build_avatar_url(avatar_key: str | None) -> str:
@@ -413,5 +380,6 @@ def get_chat_service() -> ChatService:
             internal_endpoint_url=settings.s3.internal_endpoint,
             public_endpoint_url=settings.s3.public_endpoint
         ),
-        image_processor=ImageProcessor()
+        image_processor=ImageProcessor(),
+        mapper=ChatMapper()
     )

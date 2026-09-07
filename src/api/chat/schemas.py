@@ -25,7 +25,7 @@ class MessageSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    sender: MessageSenderSchema | None
+    sender: UUID | MessageSenderSchema | None
     content: str
     type: MessageTypeEnum
     is_edited: bool
@@ -60,6 +60,7 @@ class ChatInfoSchema(BaseModel):
 class MessageHistorySchema(BaseModel):
     chat: ChatInfoSchema
     messages: list[MessageSchema]
+    profiles: list[MessageSenderSchema]
     last_read_message_id: UUID | None
     own_last_read_message_id: UUID | None
     peer_last_read_message_id: UUID | None

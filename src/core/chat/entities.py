@@ -14,7 +14,7 @@ class ChatCreationDTO:
     creator_id: UUID | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class MessageSenderDTO:
     sender_id: UUID | None
     username: str
@@ -34,7 +34,7 @@ class MessageCreationDTO:
 @dataclass
 class MessageDTO:
     id: UUID
-    sender: MessageSenderDTO | None
+    sender: UUID | MessageSenderDTO | None
     content: str
     type: MessageTypeEnum
     is_edited: bool
@@ -72,6 +72,7 @@ class ChatInfoDTO:
 class MessageHistoryDTO:
     chat: ChatInfoDTO
     messages: list[MessageDTO]
+    profiles: list[MessageSenderDTO]
     last_read_message_id: UUID | None
     own_last_read_message_id: UUID | None
     peer_last_read_message_id: UUID | None

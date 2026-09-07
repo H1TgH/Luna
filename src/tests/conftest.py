@@ -12,8 +12,8 @@ from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.auth.services import AuthService, get_auth_service
-from core.posts.services.post import PostService, get_post_service
 from core.posts.services.comment import CommentService, get_comment_service
+from core.posts.services.post import PostService, get_post_service
 from core.profile.services import ProfileService, get_profile_service
 from infrastructure.database.models.posts import PostModel
 from infrastructure.database.models.profile import ProfileModel

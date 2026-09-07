@@ -58,7 +58,7 @@ class MessageSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    sender: MessageSenderSchema | None
+    sender: MessageSenderSchema | UUID | None
     content: str
     type: MessageTypeEnum
     is_edited: bool
