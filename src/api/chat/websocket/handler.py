@@ -100,6 +100,8 @@ class WebSocketEventHandler:
             MessageCreationDTO(
                 sender_id=user_id,
                 chat_id=chat_id,
+                parent_id=data.parent_id,
+                forwarded_from=data.forwarded_from,
                 content=data.content,
                 type=MessageTypeEnum.USER,
             )

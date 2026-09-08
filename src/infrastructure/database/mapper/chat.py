@@ -30,7 +30,9 @@ class ChatMapper:
     def build_message_dto(
         self,
         message: MessageModel,
-        sender: ProfileModel | UUID | None
+        sender: ProfileModel | UUID | None,
+        parent: MessageModel | None = None,
+        forwarded: MessageModel | None = None
     ) -> MessageDTO:
         if isinstance(sender, ProfileModel):
             sender = self._build_message_sender_dto(sender)
@@ -38,6 +40,8 @@ class ChatMapper:
         return MessageDTO(
             id=message.id,
             sender=sender,
+            parent_msg=parent,
+            forwarded_msg=forwarded,
             content=message.content,
             type=message.type,
             is_edited=message.is_edited,
@@ -49,6 +53,8 @@ class ChatMapper:
     def build_message_creation_dto(
         self,
         sender_id: UUID | None,
+        parent_id: UUID | None,
+        forwarded_from: UUID | None,
         chat_id: UUID,
         content: str,
         message_type: MessageTypeEnum
@@ -56,6 +62,8 @@ class ChatMapper:
         return MessageCreationDTO(
             sender_id,
             chat_id,
+            parent_id,
+            forwarded_from,
             content,
             message_type
         )

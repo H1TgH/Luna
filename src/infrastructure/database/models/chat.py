@@ -99,6 +99,18 @@ class MessageModel(Base):
         nullable=True
     )
 
+    parent_id: Mapped[UUID | None] = mapped_column(
+        PGUUID,
+        ForeignKey("messages.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
+    forwarded_from: Mapped[UUID | None] = mapped_column(
+        PGUUID,
+        ForeignKey("messages.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
     type: Mapped[MessageTypeEnum] = mapped_column(
         PGEnum(MessageTypeEnum, name="message_type_enum")
     )

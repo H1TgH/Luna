@@ -152,6 +152,8 @@ class ChatRepository:
         message = MessageModel(
             sender_id=message_data.sender_id,
             chat_id=message_data.chat_id,
+            parent_id=message_data.parent_id,
+            forwarded_from=message_data.forwarded_from,
             content=message_data.content,
             type=message_data.type
         )
@@ -189,6 +191,18 @@ class ChatRepository:
         rows = result.all()
 
         return rows
+
+    async def get_messages_by_ids(
+        self,
+        message_ids: list[UUID]
+    ) -> list[tuple[MessageModel, ProfileModel]]:
+        stmt = (
+            select(MessageModel, ProfileModel)
+            .outerjoin(ProfileModel, MessageModel.sender_id == ProfileModel.id)
+            .where(MessageModel.id.in_(message_ids))
+        )
+        result = await self.session.execute(stmt)
+        return result.all()
 
     async def check_user_is_participant(
         self,

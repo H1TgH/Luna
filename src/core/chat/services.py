@@ -58,7 +58,7 @@ class ChatService:
                     raise InvalidParticipantsCountException("Only 2 participants can be in a private chat")
                 existing = await repo.get_personal_chat(all_users)
                 if existing:
-                    return self.mapper._build_chat_dto(existing, None, None, None, 0, False)
+                    return self.mapper.build_chat_dto(existing, None, None, 0, False)
 
             object_key = None
             if data.is_group:
@@ -81,7 +81,7 @@ class ChatService:
                 message = await repo.create_message(message_dto)
                 await repo.update_chat_last_message(chat.id, message.id)
 
-            return self.mapper._build_chat_dto(chat, None, None, None, 0, False)
+            return self.mapper.build_chat_dto(chat, None, None, 0, False)
 
     async def get_user_chats(
         self,
@@ -178,9 +178,52 @@ class ChatService:
             messages_response = []
             profiles_response = set()
 
+            replies_ids = set()
+            forwarded_ids = set()
+
+            for message, _ in messages:
+                if message.parent_id:
+                    replies_ids.add(message.parent_id)
+                if message.forwarded_from:
+                    forwarded_ids.add(message.forwarded_from)
+
+            referenced_messages = await chat_repo.get_messages_by_ids(list(replies_ids.union(forwarded_ids)))
+            if referenced_messages:
+                referenced_messages = {
+                    msg.id: msg for msg, _ in referenced_messages
+                }
+
             for message, profile in messages:
                 if message.type != MessageTypeEnum.SYSTEM:
-                    messages_response.append(self.mapper.build_message_dto(message, profile.id))
+                    if message.forwarded_from:
+                        messages_response.append(
+                            self.mapper.build_message_dto(
+                                message,
+                                profile.id,
+                                forwarded=self.mapper.build_message_dto(
+                                    referenced_messages.get(message.forwarded_from),
+                                    message.sender_id
+                                )
+                            )
+                        )
+                    elif message.parent_id:
+                        messages_response.append(
+                            self.mapper.build_message_dto(
+                                message,
+                                profile.id,
+                                parent=self.mapper.build_message_dto(
+                                    referenced_messages.get(message.parent_id),
+                                    message.sender_id
+                                )
+                            )
+                        )
+                    else:
+                        messages_response.append(
+                            self.mapper.build_message_dto(
+                                message,
+                                profile.id,
+                            )
+                        )
                     profiles_response.add(self.mapper._build_message_sender_dto(profile))
                 else:
                     messages_response.append(self.mapper.build_message_dto(message, None))
@@ -298,7 +341,7 @@ class ChatService:
 
             sender = await profile_repo.get_by_user_id(current_user_id)
             avatar_url = self._build_avatar_url(sender.avatar_key)
-            return self.mapper._build_message_dto(updated_message, sender, avatar_url)
+            return self.mapper.build_message_dto(updated_message, sender, avatar_url)
 
     async def mark_as_read(
         self,

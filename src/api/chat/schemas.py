@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID
 
@@ -27,6 +29,8 @@ class MessageSchema(BaseModel):
     id: UUID
     sender: UUID | MessageSenderSchema | None
     content: str
+    parent_msg: MessageSchema | None
+    forwarded_msg: MessageSchema | None
     type: MessageTypeEnum
     is_edited: bool
     is_deleted: bool

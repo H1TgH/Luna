@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -8,6 +10,8 @@ from core.chat.enums import MessageTypeEnum
 
 
 class NewMessageEvent(BaseModel):
+    parent_id: UUID | None = None
+    forwarded_from: UUID | None = None
     content: str
 
 
@@ -59,6 +63,8 @@ class MessageSchema(BaseModel):
 
     id: UUID
     sender: MessageSenderSchema | UUID | None
+    parent_msg: MessageSchema | None
+    forwarded_msg: MessageSchema | None
     content: str
     type: MessageTypeEnum
     is_edited: bool

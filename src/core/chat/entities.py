@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import BinaryIO
@@ -27,6 +29,8 @@ class MessageSenderDTO:
 class MessageCreationDTO:
     sender_id: UUID | None
     chat_id: UUID
+    parent_id: UUID | None
+    forwarded_from: UUID | None
     content: str
     type: MessageTypeEnum
 
@@ -35,6 +39,8 @@ class MessageCreationDTO:
 class MessageDTO:
     id: UUID
     sender: UUID | MessageSenderDTO | None
+    parent_msg: MessageDTO | None
+    forwarded_msg: MessageDTO | None
     content: str
     type: MessageTypeEnum
     is_edited: bool
