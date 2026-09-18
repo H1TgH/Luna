@@ -1,5 +1,6 @@
 import { api } from './client'
 import type { ChatPageResponse, MessageHistoryResponse, ChatMessageResponse, ProfileResponse } from '../types'
+import { prepareImageForUpload } from '../utils/imageUpload'
 
 export const chatApi = {
   createPersonal: (userId: string) =>
@@ -9,15 +10,18 @@ export const chatApi = {
         f.append('name', '')
         f.append('user_ids', userId)
         return f
-      })(), { headers: { 'Content-Type': 'multipart/form-data' } }),
+      })()),
 
-    createGroup: (name: string, userIds: string[], avatar?: File) => {
+    createGroup: async (name: string, userIds: string[], avatar?: File) => {
       const f = new FormData()
       f.append('is_group', 'true')
       f.append('name', name)
       userIds.forEach(id => f.append('user_ids', id))
-      if (avatar) f.append('chat_avatar', avatar)
-      return api.post<{ id: string }>('/api/v1/chat/', f, { headers: { 'Content-Type': 'multipart/form-data' } })
+      if (avatar) {
+        const prepared = await prepareImageForUpload(avatar, { maxEdge: 1024, quality: 0.85 })
+        f.append('chat_avatar', prepared)
+      }
+      return api.post<{ id: string }>('/api/v1/chat/', f, { timeout: 60_000 })
     },
 
   getChats: (cursor?: string, limit = 20) =>
@@ -30,8 +34,17 @@ export const chatApi = {
       params: { ...(cursor ? { cursor } : {}), limit },
     }),
 
-  sendMessage: (chatId: string, content: string) =>
-    api.post<ChatMessageResponse>('/api/v1/chat/message', { chat_id: chatId, content }),
+  sendMessage: (
+    chatId: string,
+    content: string,
+    opts?: { parent_id?: string | null; forwarded_from?: string | null },
+  ) =>
+    api.post<ChatMessageResponse>('/api/v1/chat/message', {
+      chat_id: chatId,
+      content,
+      ...(opts?.parent_id ? { parent_id: opts.parent_id } : {}),
+      ...(opts?.forwarded_from ? { forwarded_from: opts.forwarded_from } : {}),
+    }),
 
   editMessage: (messageId: string, content: string) =>
     api.patch(`/api/v1/chat/message/${messageId}`, { content }),
@@ -58,11 +71,12 @@ export const chatApi = {
   updateChatName: (chatId: string, name: string) =>
     api.patch(`/api/v1/chat/${chatId}`, { name }),
 
-  updateChatAvatar: (chatId: string, avatar: File) => {
+  updateChatAvatar: async (chatId: string, avatar: File) => {
+    const prepared = await prepareImageForUpload(avatar, { maxEdge: 1024, quality: 0.85 })
     const f = new FormData()
-    f.append('avatar', avatar)
+    f.append('avatar', prepared)
     return api.patch<{ avatar_url: string }>(`/api/v1/chat/${chatId}/avatar`, f, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60_000,
     })
   },
 

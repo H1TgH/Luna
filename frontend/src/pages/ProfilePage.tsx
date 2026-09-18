@@ -698,6 +698,7 @@ export default function ProfilePage() {
 
   const [lightbox, setLightbox] = useState<LightboxState | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'posts' | 'photos'>('posts')
   const [photos, setPhotos] = useState<ImageItem[]>([])
@@ -836,13 +837,17 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setAvatarError(null)
     setAvatarUploading(true)
     try {
       await profileApi.uploadAvatar(file)
       const { data } = await profileApi.getMe()
       setMyProfileInStore(data)
       if (isOwnProfile) setViewedProfile(data)
-    } catch {
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 413) setAvatarError('Файл слишком большой')
+      else setAvatarError('Не удалось загрузить фото')
     } finally {
       setAvatarUploading(false)
       if (avatarInputRef.current) avatarInputRef.current.value = ''
@@ -912,34 +917,43 @@ export default function ProfilePage() {
           marginBottom: '32px', paddingBottom: '28px',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
-          {/* Avatar */}
+          {/* Avatar — <label> so iOS Safari opens the picker without programmatic .click() */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <div
-              onClick={() => isOwnProfile && avatarInputRef.current?.click()}
-              style={{
-                width: '88px', height: '88px', borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(139,127,232,0.28), rgba(99,80,220,0.12))',
-                border: '2px solid rgba(139,127,232,0.18)',
-                overflow: 'hidden', cursor: isOwnProfile ? 'pointer' : 'default',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-              }}
-            >
-              {viewedProfile.avatar_url ? (
-                <img src={viewedProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
-              ) : (
-                <span style={{ fontSize: '30px', fontWeight: 500, color: 'rgba(139,127,232,0.65)', fontFamily: "'Outfit', sans-serif", userSelect: 'none' }}>
-                  {viewedProfile.first_name[0]}
-                </span>
-              )}
-              {isOwnProfile && (
+            {isOwnProfile ? (
+              <label
+                style={{
+                  width: '88px', height: '88px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(139,127,232,0.28), rgba(99,80,220,0.12))',
+                  border: '2px solid rgba(139,127,232,0.18)',
+                  overflow: 'hidden', cursor: avatarUploading ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                }}
+                onMouseEnter={(e) => {
+                  if (avatarUploading) return
+                  const overlay = e.currentTarget.querySelector('[data-avatar-overlay]') as HTMLElement | null
+                  if (overlay) overlay.style.opacity = '1'
+                }}
+                onMouseLeave={(e) => {
+                  if (avatarUploading) return
+                  const overlay = e.currentTarget.querySelector('[data-avatar-overlay]') as HTMLElement | null
+                  if (overlay) overlay.style.opacity = '0'
+                }}
+              >
+                {viewedProfile.avatar_url ? (
+                  <img src={viewedProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', pointerEvents: 'none' }} />
+                ) : (
+                  <span style={{ fontSize: '30px', fontWeight: 500, color: 'rgba(139,127,232,0.65)', fontFamily: "'Outfit', sans-serif", userSelect: 'none' }}>
+                    {viewedProfile.first_name[0]}
+                  </span>
+                )}
                 <div
+                  data-avatar-overlay
                   style={{
                     position: 'absolute', inset: 0, background: 'rgba(6,9,26,0.55)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     opacity: avatarUploading ? 1 : 0, transition: 'opacity 0.2s', borderRadius: '50%',
+                    pointerEvents: 'none',
                   }}
-                  onMouseEnter={(e) => { if (!avatarUploading) e.currentTarget.style.opacity = '1' }}
-                  onMouseLeave={(e) => { if (!avatarUploading) e.currentTarget.style.opacity = '0' }}
                 >
                   {avatarUploading ? (
                     <svg className="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -953,13 +967,47 @@ export default function ProfilePage() {
                     </svg>
                   )}
                 </div>
-              )}
-            </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*,image/heic,image/heif"
+                  disabled={avatarUploading}
+                  onChange={handleAvatarUpload}
+                  style={{
+                    position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px',
+                    overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0,
+                  }}
+                />
+              </label>
+            ) : (
+              <div
+                style={{
+                  width: '88px', height: '88px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(139,127,232,0.28), rgba(99,80,220,0.12))',
+                  border: '2px solid rgba(139,127,232,0.18)',
+                  overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                }}
+              >
+                {viewedProfile.avatar_url ? (
+                  <img src={viewedProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+                ) : (
+                  <span style={{ fontSize: '30px', fontWeight: 500, color: 'rgba(139,127,232,0.65)', fontFamily: "'Outfit', sans-serif", userSelect: 'none' }}>
+                    {viewedProfile.first_name[0]}
+                  </span>
+                )}
+              </div>
+            )}
 
             <OnlineIndicator lastSeen={viewedProfile.last_seen} />
-
-            {isOwnProfile && (
-              <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
+            {avatarError && (
+              <p style={{
+                position: 'absolute', top: '100%', left: 0, margin: '6px 0 0',
+                fontSize: '11px', color: '#f87171', fontFamily: "'Outfit', sans-serif",
+                whiteSpace: 'nowrap',
+              }}>
+                {avatarError}
+              </p>
             )}
           </div>
 

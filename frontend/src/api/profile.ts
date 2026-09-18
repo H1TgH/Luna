@@ -1,5 +1,6 @@
 import { api } from './client'
 import type { ProfileCreateRequest, ProfileResponse } from '../types'
+import { prepareImageForUpload } from '../utils/imageUpload'
 
 export const profileApi = {
   create: (data: ProfileCreateRequest) =>
@@ -14,11 +15,11 @@ export const profileApi = {
   update: (data: Partial<Omit<ProfileCreateRequest, 'username'>>) =>
     api.patch('/api/v1/user/profile/me', data),
 
-  uploadAvatar: (file: File) => {
+  uploadAvatar: async (file: File) => {
+    const prepared = await prepareImageForUpload(file, { maxEdge: 1024, quality: 0.85 })
     const formData = new FormData()
-    formData.append('avatar', file)
-    return api.post('/api/v1/user/profile/me/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    formData.append('avatar', prepared)
+    // Do not set Content-Type — browser must add multipart boundary
+    return api.post('/api/v1/user/profile/me/avatar', formData, { timeout: 60_000 })
   },
 }

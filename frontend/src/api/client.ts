@@ -8,6 +8,19 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// FormData must get multipart + boundary from the browser — not the JSON default above
+api.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    const headers = config.headers
+    if (headers && typeof headers.delete === 'function') {
+      headers.delete('Content-Type')
+    } else if (headers) {
+      delete headers['Content-Type']
+    }
+  }
+  return config
+})
+
 let isRefreshing = false
 let queue: Array<{ resolve: () => void; reject: (err: unknown) => void }> = []
 
@@ -28,7 +41,7 @@ api.interceptors.response.use(
       original._retry = true
 
       if (isRefreshing) {
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
           queue.push({ resolve, reject })
         }).then(() => api(original))
       }

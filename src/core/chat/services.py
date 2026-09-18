@@ -18,6 +18,7 @@ from core.chat.enums import MessageTypeEnum
 from core.chat.exceptions import InvalidParticipantsCountException
 from core.exceptions import PermissionDeniedException
 from infrastructure.database.mapper.chat import ChatMapper
+from infrastructure.database.models.chat import MessageModel
 from infrastructure.database.repositories.chat import ChatRepository
 from infrastructure.database.repositories.profile import ProfileRepository
 from infrastructure.database.uow import UnitOfWork
@@ -383,16 +384,27 @@ class ChatService:
                 system_message_content = f"{initiator.full_name} покинул(а) чат"
             else:
                 system_message_content = f"{initiator.full_name} исключил(а) {user.full_name}"
-            message_dto = self.mapper.build_message_creation_dto(
-                None,
-                chat.id,
-                system_message_content,
-                MessageTypeEnum.SYSTEM
-            )
-            message = await chat_repo.create_message(message_dto)
+
+            message = await self._create_system_message(chat_repo, chat_id, system_message_content)
+
             await chat_repo.update_chat_last_message(chat.id, message.id)
 
             await chat_repo.delete_user_from_chat(chat_id, user_id)
+
+    async def _create_system_message(
+        self,
+        repo: ChatRepository,
+        chat_id: UUID,
+        content: str
+    ) -> MessageModel:
+        message_dto = self.mapper.build_message_creation_dto(
+            None,
+            chat_id,
+            content,
+            MessageTypeEnum.SYSTEM
+        )
+
+        return await repo.create_message(message_dto)
 
     @staticmethod
     def _build_avatar_url(avatar_key: str | None) -> str:

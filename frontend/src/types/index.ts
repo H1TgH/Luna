@@ -79,13 +79,22 @@ export interface MessageSenderChatResponse {
 
 export interface ChatMessageResponse {
   id: string
-  sender: MessageSenderChatResponse | null
+  /** History: UUID string. WS / chat list: full sender object. System: null. */
+  sender: MessageSenderChatResponse | string | null
+  /** Flat refs (WS / as-if-fixed REST). */
+  parent_id?: string | null
+  forwarded_from?: string | null
+  /** Nested refs (history, when backend hydrates). */
+  parent_msg?: ChatMessageResponse | null
+  forwarded_msg?: ChatMessageResponse | null
   content: string
   type: MessageType
   is_edited: boolean
   is_deleted: boolean
   created_at: string
   edited_at: string | null
+  /** Optional on WS system events — profiles referenced in content. */
+  profiles?: MessageSenderChatResponse[]
 }
 
 export interface ChatInfoResponse {
@@ -120,6 +129,7 @@ export interface ChatPageResponse {
 export interface MessageHistoryResponse {
   chat: ChatInfoResponse
   messages: ChatMessageResponse[]
+  profiles: MessageSenderChatResponse[]
   last_read_message_id: string | null
   own_last_read_message_id?: string | null
   peer_last_read_message_id?: string | null

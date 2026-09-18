@@ -1,5 +1,6 @@
 import { api } from './client'
 import type { PostResponse, PostsPageResponse } from '../types'
+import { prepareImageForUpload } from '../utils/imageUpload'
 
 export interface ImageItem {
   post_id: string
@@ -8,15 +9,17 @@ export interface ImageItem {
 }
 
 export const postsApi = {
-  create: (data: { content?: string; images?: File[] }) => {
+  create: async (data: { content?: string; images?: File[] }) => {
     const formData = new FormData()
     if (data.content) formData.append('content', data.content)
     if (data.images) {
-      data.images.forEach((img) => formData.append('images', img))
+      const prepared = await Promise.all(
+        data.images.map((img) => prepareImageForUpload(img, { maxEdge: 2048, quality: 0.85 })),
+      )
+      prepared.forEach((img) => formData.append('images', img))
     }
-    return api.post<PostResponse>('/api/v1/posts/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    // Do not set Content-Type — browser must add multipart boundary
+    return api.post<PostResponse>('/api/v1/posts/', formData, { timeout: 120_000 })
   },
 
   getByUser: (profileId: string, cursor?: string, limit = 25) =>
