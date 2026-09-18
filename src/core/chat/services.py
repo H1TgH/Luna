@@ -75,6 +75,8 @@ class ChatService:
                 creator = await profile_repo.get_by_user_id(creator_id)
                 message_dto = self.mapper.build_message_creation_dto(
                     None,
+                    None,
+                    None,
                     chat.id,
                     f"Пользователь {creator.id} создал чат {data.name}",
                     MessageTypeEnum.SYSTEM
@@ -323,6 +325,8 @@ class ChatService:
             inviter = await profile_repo.get_by_user_id(inviter_id)
             message_dto = self.mapper.build_message_creation_dto(
                 None,
+                None,
+                None,
                 chat_id,
                 f"{inviter.full_name} пригласил(а) {user.full_name}",
                 MessageTypeEnum.SYSTEM
@@ -398,6 +402,8 @@ class ChatService:
         content: str
     ) -> MessageModel:
         message_dto = self.mapper.build_message_creation_dto(
+            None,
+            None,
             None,
             chat_id,
             content,
